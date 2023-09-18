@@ -14,9 +14,10 @@
 	crusher_resistant = FALSE
 	can_wire = FALSE
 	barricade_hitsound = 'sound/effects/metalhit.ogg'
-	projectile_coverage = PROJECTILE_COVERAGE_LOW
+	projectile_coverage = PROJECTILE_COVERAGE_MINIMAL
 	var/build_state = BARRICADE_BSTATE_SECURED
-	var/reinforced = FALSE	//Reinforced to be a cade or not
+	var/reinforced = FALSE //Reinforced to be a cade or not
+	var/can_be_reinforced = TRUE //can we even reinforce this handrail or not?
 
 /obj/structure/barricade/handrail/update_icon()
 	overlays.Cut()
@@ -39,22 +40,22 @@
 		if(E.icon_path && E.obj_icon_state_path)
 			overlays += image(E.icon_path, icon_state = E.obj_icon_state_path)
 
-/obj/structure/barricade/handrail/examine(mob/user)
-	..()
+/obj/structure/barricade/handrail/get_examine_text(mob/user)
+	. = ..()
 	switch(build_state)
 		if(BARRICADE_BSTATE_SECURED)
-			to_chat(user, SPAN_INFO("The [barricade_type] is safely secured to the ground."))
+			. += SPAN_INFO("The [barricade_type] is safely secured to the ground.")
 		if(BARRICADE_BSTATE_UNSECURED)
-			to_chat(user, SPAN_INFO("The bolts nailing it to the ground has been unsecured."))
+			. += SPAN_INFO("The bolts nailing it to the ground has been unsecured.")
 		if(BARRICADE_BSTATE_FORTIFIED)
 			if(reinforced)
-				to_chat(user, SPAN_INFO("The [barricade_type] has been reinforced with metal."))
+				. += SPAN_INFO("The [barricade_type] has been reinforced with metal.")
 			else
-				to_chat(user, SPAN_INFO("Metal has been laid across the [barricade_type]. Weld it to secure it."))
+				. += SPAN_INFO("Metal has been laid across the [barricade_type]. Weld it to secure it.")
 
 /obj/structure/barricade/handrail/proc/reinforce()
 	if(reinforced)
-		if(health == maxhealth)	// Drop metal if full hp when unreinforcing
+		if(health == maxhealth) // Drop metal if full hp when unreinforcing
 			new /obj/item/stack/sheet/metal(loc)
 		health = initial(health)
 		maxhealth = initial(maxhealth)
@@ -89,6 +90,8 @@
 				update_icon()
 				return
 			if(istype(W, /obj/item/stack/sheet/metal)) // Start reinforcing
+				if(!can_be_reinforced)
+					return
 				if(user.action_busy)
 					return
 				if(!skillcheck(user, SKILL_CONSTRUCTION, SKILL_CONSTRUCTION_TRAINED))
@@ -133,7 +136,7 @@
 				user.visible_message(SPAN_NOTICE("[user] takes apart [src]."),
 				SPAN_NOTICE("You take apart [src]."))
 				playsound(loc, 'sound/items/Deconstruct.ogg', 25, 1)
-				destroy(TRUE)
+				deconstruct(TRUE)
 				return
 
 		if(BARRICADE_BSTATE_FORTIFIED)
@@ -152,7 +155,7 @@
 					reinforce()
 					return
 			else
-				if(iswelder(W))	// Finish reinforcing
+				if(iswelder(W)) // Finish reinforcing
 					if(!HAS_TRAIT(W, TRAIT_TOOL_BLOWTORCH))
 						to_chat(user, SPAN_WARNING("You need a stronger blowtorch!"))
 						return
@@ -188,6 +191,8 @@
 /obj/structure/barricade/handrail/sandstone
 	name = "sandstone handrail"
 	icon_state = "hr_sandstone"
+	can_be_reinforced = FALSE
+	projectile_coverage = PROJECTILE_COVERAGE_LOW
 	stack_type = /obj/item/stack/sheet/mineral/sandstone
 	debris = list(/obj/item/stack/sheet/mineral/sandstone)
 

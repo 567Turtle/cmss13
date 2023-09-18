@@ -9,30 +9,27 @@
 	name = "storage"
 	icon = 'icons/obj/items/storage.dmi'
 	w_class = SIZE_MEDIUM
-	var/list/can_hold = new/list() 					//List of objects which this item can store (if set, it can't store anything else)
-	var/list/cant_hold = new/list() 				//List of objects which this item can't store (in effect only if can_hold isn't set)
-	var/list/bypass_w_limit = new/list() 			//a list of objects which this item can store despite not passing the w_class limit
-	var/list/click_border_start = new/list() 		//In slotless storage, stores areas where clicking will refer to the associated item
+	var/list/can_hold = new/list() //List of objects which this item can store (if set, it can't store anything else)
+	var/list/cant_hold = new/list() //List of objects which this item can't store (in effect only if can_hold isn't set)
+	var/list/bypass_w_limit = new/list() //a list of objects which this item can store despite not passing the w_class limit
+	var/list/click_border_start = new/list() //In slotless storage, stores areas where clicking will refer to the associated item
 	var/list/click_border_end = new/list()
-	var/list/hearing_items							//A list of items that use hearing for the purpose of performance
-	var/max_w_class = SIZE_SMALL 					//Max size of objects that this object can store (in effect only if can_hold isn't set)
-	var/max_storage_space = 14 						//The sum of the storage costs of all the items in this storage item.
-	var/storage_slots = 7 							//The number of storage slots in this container.
+	var/list/hearing_items //A list of items that use hearing for the purpose of performance
+	var/max_w_class = SIZE_SMALL //Max size of objects that this object can store
+	var/max_storage_space = 14 //The sum of the storage costs of all the items in this storage item.
+	var/storage_slots = 7 //The number of storage slots in this container.
 	var/atom/movable/screen/storage/boxes = null
-	var/atom/movable/screen/storage/storage_start = null 	//storage UI
+	var/atom/movable/screen/storage/storage_start = null //storage UI
 	var/atom/movable/screen/storage/storage_continue = null
 	var/atom/movable/screen/storage/storage_end = null
-	var/atom/movable/screen/storage/stored_start = null
-	var/atom/movable/screen/storage/stored_continue = null
-	var/atom/movable/screen/storage/stored_end = null
+	var/datum/item_storage_box/stored_ISB = null // This contains what previously was known as stored_start, stored_continue, and stored_end
 	var/atom/movable/screen/close/closer = null
 	var/foldable = null
-	var/use_sound = "rustle"						//sound played when used. null for no sound.
-	var/opened = FALSE 								//Has it been opened before?
-	var/list/content_watchers 						//list of mobs currently seeing the storage's contents
+	var/use_sound = "rustle" //sound played when used. null for no sound.
+	var/opened = FALSE //Has it been opened before?
+	var/list/content_watchers //list of mobs currently seeing the storage's contents
 	var/storage_flags = STORAGE_FLAGS_DEFAULT
-	var/has_gamemode_skin = FALSE					///Whether to use map-variant skins.
-
+	var/has_gamemode_skin = FALSE ///Whether to use map-variant skins.
 
 /obj/item/storage/MouseDrop(obj/over_object as obj)
 	if(CAN_PICKUP(usr, src))
@@ -58,7 +55,7 @@
 						usr.put_in_l_hand(src)
 			add_fingerprint(usr)
 
-/obj/item/storage/clicked(var/mob/user, var/list/mods)
+/obj/item/storage/clicked(mob/user, list/mods)
 	if(!mods["shift"] && mods["middle"] && CAN_PICKUP(user, src))
 		handle_mmb_open(user)
 		return TRUE
@@ -71,7 +68,7 @@
 
 	return ..()
 
-/obj/item/storage/proc/handle_mmb_open(var/mob/user)
+/obj/item/storage/proc/handle_mmb_open(mob/user)
 	open(user)
 
 /obj/item/storage/proc/return_inv()
@@ -118,7 +115,7 @@
 /obj/item/storage/proc/add_to_watchers(mob/user)
 	if(!(user in content_watchers))
 		LAZYADD(content_watchers, user)
-		RegisterSignal(user, COMSIG_PARENT_QDELETING, .proc/watcher_deleted)
+		RegisterSignal(user, COMSIG_PARENT_QDELETING, PROC_REF(watcher_deleted))
 
 /obj/item/storage/proc/del_from_watchers(mob/watcher)
 	if(watcher in content_watchers)
@@ -168,14 +165,14 @@
 	update_icon()
 
 //This proc draws out the inventory and places the items on it. It uses the standard position.
-/obj/item/storage/proc/slot_orient_objs(var/rows, var/cols, var/list/obj/item/display_contents)
+/obj/item/storage/proc/slot_orient_objs(rows, cols, list/obj/item/display_contents)
 	var/cx = 4
 	var/cy = 2+rows
 	boxes.screen_loc = "4:16,2:16 to [4+cols]:16,[2+rows]:16"
 
 	if (storage_flags & STORAGE_CONTENT_NUM_DISPLAY)
 		for (var/datum/numbered_display/ND in display_contents)
-			ND.sample_object.mouse_opacity = 2
+			ND.sample_object.mouse_opacity = MOUSE_OPACITY_OPAQUE
 			ND.sample_object.screen_loc = "[cx]:16,[cy]:16"
 			ND.sample_object.maptext = "<font color='white'>[(ND.number > 1)? "[ND.number]" : ""]</font>"
 			ND.sample_object.layer = ABOVE_HUD_LAYER
@@ -186,7 +183,7 @@
 				cy--
 	else
 		for (var/obj/item/O in contents)
-			O.mouse_opacity = 2 //So storage items that start with contents get the opacity trick.
+			O.mouse_opacity = MOUSE_OPACITY_OPAQUE //So storage items that start with contents get the opacity trick.
 			O.screen_loc = "[cx]:[16+O.hud_offset],[cy]:16"
 			O.layer = ABOVE_HUD_LAYER
 			O.plane = ABOVE_HUD_PLANE
@@ -204,6 +201,8 @@ var/list/global/item_storage_box_cache = list()
 	var/atom/movable/screen/storage/start = null
 	var/atom/movable/screen/storage/continued = null
 	var/atom/movable/screen/storage/end = null
+	/// The index that indentifies me inside item_storage_box_cache
+	var/index
 
 /datum/item_storage_box/New()
 	start = new()
@@ -213,7 +212,14 @@ var/list/global/item_storage_box_cache = list()
 	end = new()
 	end.icon_state = "stored_end"
 
-/obj/item/storage/proc/space_orient_objs(var/list/obj/item/display_contents)
+/datum/item_storage_box/Destroy(force, ...)
+	QDEL_NULL(start)
+	QDEL_NULL(continued)
+	QDEL_NULL(end)
+	item_storage_box_cache[index] = null // Or would it be better to -= src?
+	return ..()
+
+/obj/item/storage/proc/space_orient_objs(list/obj/item/display_contents)
 	var/baseline_max_storage_space = 21 //should be equal to default backpack capacity
 	var/storage_cap_width = 2 //length of sprite for start and end of the box representing total storage space
 	var/stored_cap_width = 4 //length of sprite for start and end of the box representing the stored item
@@ -243,11 +249,12 @@ var/list/global/item_storage_box_cache = list()
 	for(var/obj/item/O in contents)
 		startpoint = endpoint + 1
 		endpoint += storage_width * O.get_storage_cost()/max_storage_space
+		var/isb_index = "[startpoint], [endpoint], [stored_cap_width]"
 
 		click_border_start.Add(startpoint)
 		click_border_end.Add(endpoint)
 
-		if(!item_storage_box_cache["[startpoint], [endpoint], [stored_cap_width]"])
+		if(!item_storage_box_cache[isb_index])
 			var/datum/item_storage_box/box = new()
 			var/matrix/M_start = matrix()
 			var/matrix/M_continue = matrix()
@@ -259,16 +266,15 @@ var/list/global/item_storage_box_cache = list()
 			box.start.apply_transform(M_start)
 			box.continued.apply_transform(M_continue)
 			box.end.apply_transform(M_end)
-			item_storage_box_cache["[startpoint], [endpoint], [stored_cap_width]"] = box
+			box.index = isb_index
+			item_storage_box_cache[isb_index] = box
 
-		var/datum/item_storage_box/ISB = item_storage_box_cache["[startpoint], [endpoint], [stored_cap_width]"]
-		stored_start = ISB.start
-		stored_continue = ISB.continued
-		stored_end = ISB.end
+		var/datum/item_storage_box/ISB = item_storage_box_cache[isb_index]
+		stored_ISB = ISB
 
-		storage_start.overlays += src.stored_start
-		storage_start.overlays += src.stored_continue
-		storage_start.overlays += src.stored_end
+		storage_start.overlays += ISB.start
+		storage_start.overlays += ISB.continued
+		storage_start.overlays += ISB.end
 
 		O.screen_loc = "4:[round((startpoint+endpoint)/2)+(2+O.hud_offset)],2:16"
 		O.layer = ABOVE_HUD_LAYER
@@ -277,7 +283,7 @@ var/list/global/item_storage_box_cache = list()
 	src.closer.screen_loc = "4:[storage_width+19],2:16"
 	return
 
-/atom/movable/screen/storage/clicked(var/mob/user, var/list/mods) //Much of this is replicated do_click behaviour.
+/atom/movable/screen/storage/clicked(mob/user, list/mods) //Much of this is replicated do_click behaviour.
 	if(user.is_mob_incapacitated() || !isturf(user.loc))
 		return TRUE
 
@@ -301,7 +307,10 @@ var/list/global/item_storage_box_cache = list()
 
 		for(var/i in 1 to length(S.click_border_start))
 			if(S.click_border_start[i] <= click_x && click_x <= S.click_border_end[i])
-				I = LAZYACCESS(S.contents, i)
+				var/list/content_items = list()
+				for(var/obj/item/content_item in S.contents)
+					content_items += content_item
+				I = LAZYACCESS(content_items, i)
 				if(I && I.Adjacent(user)) //Catches pulling items out of nested storage.
 					if(I.clicked(user, mods)) //Examine, alt-click etc.
 						return TRUE
@@ -368,12 +377,12 @@ var/list/global/item_storage_box_cache = list()
 	return
 
 ///Returns TRUE if there is room for the given item. W_class_override allows checking for just a generic W_class, meant for checking shotgun handfuls without having to spawn and delete one just to check.
-/obj/item/storage/proc/has_room(obj/item/W as obj, W_class_override = null)
+/obj/item/storage/proc/has_room(obj/item/new_item, W_class_override = null)
 	if(storage_slots != null && contents.len < storage_slots)
 		return TRUE //At least one open slot.
 	//calculate storage space only for containers that don't have slots
 	if (storage_slots == null)
-		var/sum_storage_cost = W_class_override ? W_class_override : W.get_storage_cost() //Takes the override if there is one, the given item otherwise.
+		var/sum_storage_cost = W_class_override ? W_class_override : new_item.get_storage_cost() //Takes the override if there is one, the given item otherwise.
 		for(var/obj/item/I in contents)
 			sum_storage_cost += I.get_storage_cost() //Adds up the combined storage costs which will be in the storage item if the item is added to it.
 
@@ -405,8 +414,8 @@ var/list/global/item_storage_box_cache = list()
 		if(L.mode)
 			return 0
 
-	if(W.heat_source && !isigniter(W))
-		to_chat(usr, SPAN_ALERT("[W] is on fire!"))
+	if(W.heat_source && !(W.flags_item & IGNITING_ITEM))
+		to_chat(usr, SPAN_ALERT("[W] is ignited, you can't store it!"))
 		return
 
 	if(!can_hold_type(W.type))
@@ -433,7 +442,7 @@ var/list/global/item_storage_box_cache = list()
 		return 0
 
 	if(W.w_class >= src.w_class && (isstorage(W)))
-		if(!istype(src, /obj/item/storage/backpack/holding))	//bohs should be able to hold backpacks again. The override for putting a boh in a boh is in backpack.dm.
+		if(!istype(src, /obj/item/storage/backpack/holding)) //bohs should be able to hold backpacks again. The override for putting a boh in a boh is in backpack.dm.
 			if(!stop_messages)
 				to_chat(usr, SPAN_NOTICE("[src] cannot hold [W] as it's a storage item of the same size."))
 			return 0 //To prevent the stacking of same sized storage items.
@@ -445,23 +454,23 @@ That's done by can_be_inserted(). Its checks are whether the item exists, is an 
 The stop_warning parameter will stop the insertion message from being displayed. It is intended for cases where you are inserting multiple
 items at once, such as when picking up all the items on a tile with one click.
 user can be null, it refers to the potential mob doing the insertion.**/
-/obj/item/storage/proc/handle_item_insertion(obj/item/W, prevent_warning = 0, mob/user)
-	if(!istype(W))
+/obj/item/storage/proc/handle_item_insertion(obj/item/new_item, prevent_warning = FALSE, mob/user)
+	if(!istype(new_item))
 		return FALSE
-	if(user && W.loc == user)
-		if(!user.drop_inv_item_to_loc(W, src))
+	if(user && new_item.loc == user)
+		if(!user.drop_inv_item_to_loc(new_item, src))
 			return FALSE
 	else
-		W.forceMove(src)
+		new_item.forceMove(src)
 
-	_item_insertion(W, prevent_warning, user)
+	_item_insertion(new_item, prevent_warning, user)
 	return TRUE
 
 /**Inserts the item. Separate proc because handle_item_insertion isn't guaranteed to insert
 and it therefore isn't safe to override it before calling parent. Updates icon when done.
 Can be called directly but only if the item was spawned inside src - handle_item_insertion is safer.
 W is always an item. stop_warning prevents messaging. user may be null.**/
-/obj/item/storage/proc/_item_insertion(obj/item/W, prevent_warning = 0, mob/user)
+/obj/item/storage/proc/_item_insertion(obj/item/W, prevent_warning = FALSE, mob/user)
 	W.on_enter_storage(src)
 	if(user)
 		if (user.client && user.s_active != src)
@@ -469,14 +478,14 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 		add_fingerprint(user)
 		if(!prevent_warning)
 			var/visidist = W.w_class >= 3 ? 3 : 1
-			user.visible_message(SPAN_NOTICE("[usr] puts [W] into [src]."),\
+			user.visible_message(SPAN_NOTICE("[user] puts [W] into [src]."),\
 								SPAN_NOTICE("You put \the [W] into [src]."),\
 								null, visidist)
 	orient2hud()
 	for(var/mob/M in can_see_content())
 		show_to(M)
 	if (storage_slots)
-		W.mouse_opacity = 2 //not having to click the item's tiny sprite to take it out of the storage.
+		W.mouse_opacity = MOUSE_OPACITY_OPAQUE //not having to click the item's tiny sprite to take it out of the storage.
 	update_icon()
 
 ///Call this proc to handle the removal of an item from the storage item. The item will be moved to the atom sent as new_target.
@@ -522,6 +531,16 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 		return //Robots can't interact with storage items.
 
 	return attempt_item_insertion(W, FALSE, user)
+
+/obj/item/storage/equipped(mob/user, slot, silent)
+	if ((storage_flags & STORAGE_ALLOW_EMPTY))
+		if(!isxeno(user))
+			verbs |= /obj/item/storage/verb/empty_verb
+			verbs |= /obj/item/storage/verb/toggle_click_empty
+		else
+			verbs -= /obj/item/storage/verb/empty_verb
+			verbs -= /obj/item/storage/verb/toggle_click_empty
+	..()
 
 /obj/item/storage/proc/attempt_item_insertion(obj/item/W as obj, prevent_warning = FALSE, mob/user as mob)
 	if(!can_be_inserted(W))
@@ -582,7 +601,7 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 	var/mob/living/carbon/human/H = usr
 	empty(H, get_turf(H))
 
-/obj/item/storage/proc/empty(var/mob/user, var/turf/T)
+/obj/item/storage/proc/empty(mob/user, turf/T)
 	if (!(storage_flags & STORAGE_ALLOW_EMPTY) || !ishuman(user) || !(user.l_hand == src || user.r_hand == src) || user.is_mob_incapacitated())
 		return
 
@@ -608,9 +627,70 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 		remove_from_storage(I, T)
 	user.visible_message(SPAN_NOTICE("[user] empties \the [src]."),
 		SPAN_NOTICE("You empty \the [src]."))
+	if (use_sound)
+		playsound(loc, use_sound, 25, TRUE, 3)
 
-/obj/item/storage/proc/dump_ammo_to(obj/item/ammo_magazine/ammo_dumping, mob/user, var/amount_to_dump = 5) //amount_to_dump should never actually need to be used as default value
+/obj/item/storage/verb/shake_verb()
+	set name = "Shake"
+	set category = "Object"
+	set src in usr
+	var/mob/user_mob = usr
+	shake(user_mob, get_turf(user_mob))
+
+/obj/item/storage/proc/shake(mob/user, turf/tile)
+	if(!(storage_flags & STORAGE_ALLOW_EMPTY))
+		return
+
+	if(user.l_hand != src && user.r_hand != src && user.back != src)
+		return
+
+	if(user.is_mob_incapacitated())
+		return
+
+	if (!isturf(tile) || get_dist(src, tile) > 1)
+		tile = get_turf(src)
+
+	if (use_sound)
+		playsound(loc, use_sound, 25, TRUE, 3)
+
+	if(!length(contents))
+		if(prob(25) && isxeno(user))
+			user.drop_inv_item_to_loc(src, tile)
+			user.visible_message(SPAN_NOTICE("[user] shakes \the [src] off."),
+				SPAN_NOTICE("You shake \the [src] off."))
+		else
+			user.visible_message(SPAN_NOTICE("[user] shakes \the [src] but nothing falls out."),
+				SPAN_NOTICE("You shake \the [src] but nothing falls out. It feels empty."))
+		return
+
+	if(!allowed(user))
+		user.visible_message(SPAN_NOTICE("[user] shakes \the [src] but nothing falls out."),
+			SPAN_NOTICE("You shake \the [src] but nothing falls out. Access denied."))
+		return
+
+	if(!prob(75))
+		user.visible_message(SPAN_NOTICE("[user] shakes \the [src] but nothing falls out."),
+			SPAN_NOTICE("You shake \the [src] but nothing falls out."))
+		return
+
+	storage_close(user)
+	var/obj/item/item_obj
+	if(storage_flags & STORAGE_USING_FIFO_DRAWING)
+		item_obj = contents[1]
+	else
+		item_obj = contents[contents.len]
+	if(!istype(item_obj))
+		return
+	remove_from_storage(item_obj, tile)
+	user.visible_message(SPAN_NOTICE("[user] shakes \the [src] and \a [item_obj] falls out."),
+		SPAN_NOTICE("You shake \the [src] and \a [item_obj] falls out."))
+
+/obj/item/storage/proc/dump_ammo_to(obj/item/ammo_magazine/ammo_dumping, mob/user, amount_to_dump = 5) //amount_to_dump should never actually need to be used as default value
 	if(user.action_busy)
+		return
+
+	if(ammo_dumping.flags_magazine & AMMUNITION_CANNOT_REMOVE_BULLETS)
+		to_chat(user, SPAN_WARNING("You can't remove ammo from \the [ammo_dumping]!"))
 		return
 
 	if(ammo_dumping.flags_magazine & AMMUNITION_HANDFUL_BOX)
@@ -640,25 +720,26 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 			to_chat(user, SPAN_WARNING("[ammo_dumping] is empty."))
 	return TRUE
 
-/obj/item/storage/proc/dump_into(obj/item/storage/M, mob/user)
+/obj/item/storage/proc/dump_into(obj/item/storage/origin_storage, mob/user)
+
 	if(user.action_busy)
 		return
 
-	if(!M.contents.len)
-		to_chat(user, SPAN_WARNING("[M] is empty."))
+	if(!origin_storage.contents.len)
+		to_chat(user, SPAN_WARNING("[origin_storage] is empty."))
 		return
-	if(!has_room(M.contents[1])) //Does it have room for the first item to be inserted?
+	if(!has_room(origin_storage.contents[1])) //Does it have room for the first item to be inserted?
 		to_chat(user, SPAN_WARNING("[src] is full."))
 		return
 
-	to_chat(user, SPAN_NOTICE("You start refilling [src] with [M]."))
+	to_chat(user, SPAN_NOTICE("You start refilling [src] with [origin_storage]."))
 	if(!do_after(user, 1.5 SECONDS, INTERRUPT_ALL, BUSY_ICON_GENERIC))
 		return
-	for(var/obj/item/I in M)
-		if(!has_room(I))
+	for(var/obj/item/new_item in origin_storage)
+		if(!has_room(new_item))
 			break
-		M.remove_from_storage(I)
-		handle_item_insertion(I, TRUE, user) //quiet insertion
+		origin_storage.remove_from_storage(new_item)
+		handle_item_insertion(new_item, TRUE, user) //quiet insertion
 
 	playsound(user.loc, "rustle", 15, TRUE, 6)
 	return TRUE
@@ -674,6 +755,7 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 	if (!(storage_flags & STORAGE_ALLOW_EMPTY))
 		verbs -= /obj/item/storage/verb/empty_verb
 		verbs -= /obj/item/storage/verb/toggle_click_empty
+		verbs -= /obj/item/storage/verb/shake_verb
 
 	boxes = new
 	boxes.name = "storage"
@@ -717,9 +799,9 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 	storage_close(watcher)
 
 /obj/item/storage/proc/dump_objectives()
-	for(var/obj/item/I in src)
-		if(I.is_objective)
-			I.forceMove(loc)
+	for(var/obj/item/cur_item in src)
+		if(cur_item.is_objective)
+			remove_from_storage(cur_item, loc)
 
 
 /obj/item/storage/Destroy()
@@ -731,9 +813,7 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 	QDEL_NULL(storage_start)
 	QDEL_NULL(storage_continue)
 	QDEL_NULL(storage_end)
-	QDEL_NULL(stored_start)
-	QDEL_NULL(stored_continue)
-	QDEL_NULL(stored_end)
+	QDEL_NULL(stored_ISB)
 	QDEL_NULL(closer)
 	return ..()
 
@@ -770,7 +850,7 @@ W is always an item. stop_warning prevents messaging. user may be null.**/
 	if(isturf(target) && get_dist(src, target) <= 1 && storage_flags & STORAGE_CLICK_EMPTY)
 		empty(user, target)
 
-/obj/item/storage/hear_talk(mob/living/M as mob, msg, var/verb="says", var/datum/language/speaking, var/italics = 0)
+/obj/item/storage/hear_talk(mob/living/M, msg, verb, datum/language/speaking, italics)
 	// Whatever is stored in /storage/ substypes should ALWAYS be an item
 	for (var/obj/item/I as anything in hearing_items)
 		I.hear_talk(M, msg, verb, speaking, italics)
@@ -803,7 +883,7 @@ Returns FALSE if the atom isn't somewhere inside the container's contents.**/
 		cur_atom = cur_atom.loc
 
 	if(!cur_atom)
-		return FALSE	//inside something with a null loc.
+		return FALSE //inside something with a null loc.
 
 /**Like get storage depth to, but returns the depth to the nearest turf, inclusively
 Returns FALSE if no top level turf (a loc was null somewhere, or a non-turf atom's loc was an area somehow).**/

@@ -8,6 +8,7 @@
 	w_class = SIZE_LARGE
 	flags_equip_slot = SLOT_BACK
 	flags_atom = OPENCONTAINER
+	possible_transfer_amounts = null//no point giving it possibility when mister can't it just confuse people
 	volume = 500
 	var/fill_reagent = "water"
 	var/spawn_empty = FALSE
@@ -83,7 +84,9 @@
 /obj/item/reagent_container/glass/watertank/verb/toggle_mister_verb()
 	set name = "Toggle Mister"
 	set category = "Object"
+	set src in usr
 	toggle_mister(usr)
+
 
 /obj/item/reagent_container/glass/watertank/MouseDrop(obj/over_object as obj)
 	if(!CAN_PICKUP(usr, src))
@@ -113,12 +116,12 @@
 	..()
 	remove_noz()
 
-/obj/item/reagent_container/glass/watertank/examine(mob/user)
-	..()
+/obj/item/reagent_container/glass/watertank/get_examine_text(mob/user)
+	. = ..()
 	if(!noz || QDELETED(noz) || (noz in src))
-		to_chat(user, SPAN_NOTICE("Its nozzle is attached."))
+		. += SPAN_NOTICE("Its nozzle is attached.")
 	else
-		to_chat(user, SPAN_NOTICE("Its nozzle is detached."))
+		. += SPAN_NOTICE("Its nozzle is detached.")
 
 // This mister item is intended as an extension of the watertank and always attached to it.
 // Therefore, it's designed to be "locked" to the player's hands or extended back onto
@@ -132,7 +135,7 @@
 	item_state = "nozzle"
 	w_class = SIZE_LARGE
 	flags_equip_slot = null
-	amount_per_transfer_from_this = 50
+	amount_per_transfer_from_this = 5
 	possible_transfer_amounts = null
 	spray_size = 5
 	volume = 500
@@ -146,12 +149,12 @@
 	if(!istype(W))
 		return INITIALIZE_HINT_QDEL
 
-/obj/item/reagent_container/spray/mister/examine(mob/user)
-	..()
+/obj/item/reagent_container/spray/mister/get_examine_text(mob/user)
+	. = ..()
 	var/obj/item/reagent_container/glass/watertank/W = user.back
 	if(!istype(W))
 		return
-	to_chat(user, "It is linked to \the [W].")
+	. += "It is linked to \the [W]."
 
 /obj/item/reagent_container/spray/mister/afterattack(atom/A, mob/user, proximity)
 	//this is what you get for using afterattack() TODO: make is so this is only called if attackby() returns 0 or something
@@ -223,22 +226,22 @@
 		return
 	..()
 
-/obj/item/reagent_container/glass/watertank/atmos/examine(mob/user)
+/obj/item/reagent_container/glass/watertank/atmos/get_examine_text(mob/user)
 	. = ..()
 	switch(nozzle_mode)
 		if(EXTINGUISHER)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("extinguisher")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("extinguisher")] mode.")
 			return
 		if(METAL_FOAM)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foamer")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foamer")] mode.")
 			return
 		if(METAL_LAUNCHER)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foam launcher")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foam launcher")] mode.")
 			return
 
 /obj/item/reagent_container/spray/mister/atmos
 	name = "multipurpose nozzle"
-	desc = "A heavy duty foam-spraying nozzle attached to a firefighter's backpack tank."
+	desc = "A heavy-duty foam-spraying nozzle attached to a firefighter's backpack tank."
 	icon_state = "fnozzle"
 	item_state = "fnozzle"
 	w_class = SIZE_LARGE
@@ -251,11 +254,12 @@
 
 /obj/item/reagent_container/spray/mister/atmos/Initialize(mapload)
 	. = ..()
+	if(!istype(loc, /obj/item/reagent_container/glass/watertank/atmos))
+		return INITIALIZE_HINT_QDEL
+
 	tank = loc
 	nozzle_mode = tank.nozzle_mode
 
-/obj/item/reagent_container/spray/mister/atmos/Initialize()
-	. = ..()
 	initialize_internal_extinguisher()
 	update_icon()
 
@@ -265,15 +269,15 @@
 	internal_extinguisher.create_reagents(internal_extinguisher.max_water)
 	internal_extinguisher.reagents.add_reagent("water", internal_extinguisher.max_water)
 
-/obj/item/reagent_container/spray/mister/atmos/examine(mob/user)
+/obj/item/reagent_container/spray/mister/atmos/get_examine_text(mob/user)
 	. = ..()
 	switch(nozzle_mode)
 		if(EXTINGUISHER)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("extinguisher")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("extinguisher")] mode.")
 		if(METAL_FOAM)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foamer")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foamer")] mode.")
 		if(METAL_LAUNCHER)
-			to_chat(user, SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foam launcher")] mode."))
+			. += SPAN_NOTICE("It is set to [SPAN_HELPFUL("metal foam launcher")] mode.")
 
 /obj/item/reagent_container/spray/mister/atmos/update_icon()
 	. = ..()
@@ -307,7 +311,7 @@
 	update_icon()
 
 /obj/item/reagent_container/spray/mister/atmos/afterattack(atom/target, mob/user)
-	if(!isSynth(user))
+	if(!issynth(user))
 		to_chat(user, SPAN_WARNING("You have no idea how use \the [src]!"))
 		return
 	if(nozzle_mode == EXTINGUISHER)

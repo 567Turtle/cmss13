@@ -11,21 +11,22 @@
 	item_state = "broken_beer" //Generic held-item sprite until unique ones are made.
 	///This excludes all the juices and dairy in cartons that are also defined in this file.
 	var/isGlass = TRUE
+	black_market_value = 25
 
-/obj/item/reagent_container/food/drinks/bottle/bullet_act(obj/item/projectile/P)
+/obj/item/reagent_container/food/drinks/bottle/bullet_act(obj/projectile/P)
 	. = ..()
 	if(isGlass)
 		smash()
 
 ///Audio/visual bottle breaking effects start here
 /obj/item/reagent_container/food/drinks/bottle/proc/smash(mob/living/target, mob/living/user)
-	var/obj/item/weapon/melee/broken_bottle/B
+	var/obj/item/weapon/broken_bottle/B
 	if(user)
 		user.temp_drop_inv_item(src)
-		B = new /obj/item/weapon/melee/broken_bottle(user.loc)
+		B = new /obj/item/weapon/broken_bottle(user.loc)
 		user.put_in_active_hand(B)
 	else
-		B = new /obj/item/weapon/melee/broken_bottle(src.loc)
+		B = new /obj/item/weapon/broken_bottle(src.loc)
 	if(prob(33))
 		if(target)
 			new/obj/item/shard(target.loc) // Create a glass shard at the target's location!
@@ -60,21 +61,21 @@
 
 	target.apply_damage(force, BRUTE, affecting, sharp=0)
 
-	if(affecting == "head" && iscarbon(target) && !isXeno(target))
+	if(affecting == "head" && iscarbon(target) && !isxeno(target))
 		for(var/mob/O in viewers(user, null))
 			if(target != user)
-				O.show_message(text(SPAN_DANGER("<B>[target] has been hit over the head with a bottle of [name], by [user]!</B>")), 1)
+				O.show_message(text(SPAN_DANGER("<B>[target] has been hit over the head with a bottle of [name], by [user]!</B>")), SHOW_MESSAGE_VISIBLE)
 			else
-				O.show_message(text(SPAN_DANGER("<B>[target] hit \himself with a bottle of [name] on the head!</B>")), 1)
+				O.show_message(text(SPAN_DANGER("<B>[target] hit \himself with a bottle of [name] on the head!</B>")), SHOW_MESSAGE_VISIBLE)
 		if(drowsy_threshold > 0)
 			target.apply_effect(min(drowsy_threshold, 10) , DROWSY)
 
 	else //Regular attack text
 		for(var/mob/O in viewers(user, null))
 			if(target != user)
-				O.show_message(text(SPAN_DANGER("<B>[target] has been attacked with a bottle of [name], by [user]!</B>")), 1)
+				O.show_message(text(SPAN_DANGER("<B>[target] has been attacked with a bottle of [name], by [user]!</B>")), SHOW_MESSAGE_VISIBLE)
 			else
-				O.show_message(text(SPAN_DANGER("<B>[target] has attacked \himself with a bottle of [name]!</B>")), 1)
+				O.show_message(text(SPAN_DANGER("<B>[target] has attacked \himself with a bottle of [name]!</B>")), SHOW_MESSAGE_VISIBLE)
 
 	user.attack_log += text("\[[time_stamp()]\] <font color='red'>Has attacked [target.name] ([target.ckey]) with a bottle!</font>")
 	target.attack_log += text("\[[time_stamp()]\] <font color='orange'>Has been smashed with a bottle by [user.name] ([user.ckey])</font>")
@@ -82,7 +83,7 @@
 
 	if(reagents)
 		for(var/mob/O in viewers(user, null))
-			O.show_message(text(SPAN_NOTICE("<B>The contents of \the [src] splashes all over [target]!</B>")), 1)
+			O.show_message(text(SPAN_NOTICE("<B>The contents of \the [src] splashes all over [target]!</B>")), SHOW_MESSAGE_VISIBLE)
 		reagents.reaction(target, TOUCH)
 
 	smash(target, user)
@@ -120,7 +121,7 @@
 ///Alcohol bottles and their contents.
 /obj/item/reagent_container/food/drinks/bottle/gin
 	name = "\improper Griffeater Gin"
-	desc = "A bottle of high quality gin, produced in the New London Space Station."
+	desc = "A bottle of high-quality gin, produced in the New London Space Station."
 	icon_state = "ginbottle"
 	center_of_mass = "x=16;y=4"
 
@@ -164,6 +165,7 @@
 	name = "\improper Red Star Vodka promotional bottle"
 	desc = "A promotional chess themed bottle of Red Star Vodka."
 	icon_state = "chess"
+	black_market_value = 15
 
 /obj/item/reagent_container/food/drinks/bottle/vodka/chess/b_pawn
 	name = "\improper Black Pawn bottle"
@@ -212,6 +214,13 @@
 /obj/item/reagent_container/food/drinks/bottle/vodka/chess/w_queen
 	name = "\improper White Queen bottle"
 	icon_state = "w_queen"
+
+/obj/item/reagent_container/food/drinks/bottle/vodka/chess/random/Initialize()
+	. = ..()
+	var/newbottle = pick(subtypesof(/obj/item/reagent_container/food/drinks/bottle/vodka/chess))
+	new newbottle(loc)
+	qdel(src)
+
 
 /obj/item/reagent_container/food/drinks/bottle/tequila
 	name = "\improper Caccavo Guaranteed Quality tequila"
@@ -305,7 +314,7 @@
 
 /obj/item/reagent_container/food/drinks/bottle/cognac
 	name = "Chateau De Baton Premium Cognac"
-	desc = "A sweet and strongly alchoholic drink, made after numerous distillations and years of maturing. You might as well not scream 'SHITCURITY' this time."
+	desc = "A sweet and strongly alcoholic drink, made after numerous distillations and years of maturing. You might as well not scream 'SHITCURITY' this time."
 	icon_state = "cognacbottle"
 	center_of_mass = "x=16;y=6"
 
@@ -332,6 +341,16 @@
 /obj/item/reagent_container/food/drinks/bottle/absinthe/Initialize()
 	. = ..()
 	reagents.add_reagent("absinthe", 100)
+
+/obj/item/reagent_container/food/drinks/bottle/blackout //used for testing alcohol code
+	name = "Blackout Stout"
+	desc = "Renowned through space and time, a bottle of Blackout is enough to knock out almost anyone. A true test for the true drunkard."
+	icon_state = "pwineglass"
+	center_of_mass = "x=16;y=6"
+
+/obj/item/reagent_container/food/drinks/bottle/blackout/Initialize()
+	. = ..()
+	reagents.add_reagent("blackout", 100)
 
 /obj/item/reagent_container/food/drinks/bottle/melonliquor
 	name = "Emeraldine Melon Liquor"
@@ -365,7 +384,7 @@
 
 /obj/item/reagent_container/food/drinks/bottle/pwine
 	name = "Warlock's Velvet"
-	desc = "What a delightful packaging for a surely high quality wine! The vintage must be amazing!"
+	desc = "What a delightful packaging for a surely high-quality wine! The vintage must be amazing!"
 	icon_state = "pwinebottle"
 	center_of_mass = "x=16;y=4"
 
@@ -402,7 +421,7 @@
 
 /obj/item/reagent_container/food/drinks/bottle/beer/craft/partypopper
 	name = "Party Popper Ale"
-	desc = "A fun, exotic craft beer from the colonies that mixes in a tiny bit of sugar along with light, fruity ale. The result makes the taste buds in your mouth do a little dance, presumably of confusion, and is said to make people smile after a sip. Best served at parties, worst served at funerals. Smile over your best friends's grave, why don't you."
+	desc = "A fun, exotic craft beer from the colonies that mixes in a tiny bit of sugar along with light, fruity ale. The result makes the taste buds in your mouth do a little dance, presumably of confusion, and is said to make people smile after a sip. Best served at parties, worst served at funerals. Smile over your best friend's grave, why don't you."
 	icon_state = "partypopper"
 
 /obj/item/reagent_container/food/drinks/bottle/beer/craft/tazhushka
@@ -417,7 +436,7 @@
 
 /obj/item/reagent_container/food/drinks/bottle/beer/craft/mono
 	name = "Mono Lager"
-	desc = "This black and white beer bottle does not say where it's from, nor does it say what it is supposed to be. All you know is that it is a beer, and it has a rather bland taste. Makes you feel like you're looking through a photo from four centuries ago. Rumor is f you say the name fast enough, it makes you want to say a long-winded, villainous speech."
+	desc = "This black and white beer bottle does not say where it's from, nor does it say what it is supposed to be. All you know is that it is a beer, and it has a rather bland taste. Makes you feel like you're looking through a photo from four centuries ago. Rumor is if you say the name fast enough, it makes you want to say a long-winded, villainous speech."
 	icon_state = "mono"
 
 //////////////////////////JUICES AND STUFF ///////////////////////

@@ -88,6 +88,16 @@
 		new /obj/item/reagent_container/food/snacks/grown/tomato(src)
 	for(var/i = 0, i < 2, i++)
 		new /obj/item/reagent_container/food/snacks/grown/whitebeet(src)
+	for(var/i = 0, i < 2, i++)
+		new /obj/item/reagent_container/food/snacks/grown/cherries(src)
+	for(var/i = 0, i < 2, i++)
+		new /obj/item/reagent_container/food/snacks/grown/lime(src)
+	for(var/i = 0, i < 2, i++)
+		new /obj/item/reagent_container/food/snacks/grown/lemon(src)
+	for(var/i = 0, i < 2, i++)
+		new /obj/item/reagent_container/food/snacks/grown/orange(src)
+	for(var/i = 0, i < 2, i++)
+		new /obj/item/reagent_container/food/snacks/grown/banana(src)
 
 /obj/structure/closet/secure_closet/freezer/money
 	name = "Freezer"
@@ -115,7 +125,7 @@
 
 /obj/structure/closet/secure_closet/freezer/industry
 	name = "Industry Freezer"
-	desc = "A powerful fine tuned freezer used to polymerize chemicals in the cold. This one is set to the perfect temperature for paraformaldehyde polymerization. The freezer must be kept closed for polymerization."
+	desc = "A powerful fine-tuned freezer used to polymerize chemicals in the cold. This one is set to the perfect temperature for paraformaldehyde polymerization. The freezer must be kept closed for polymerization."
 	req_access = list(ACCESS_MARINE_OT)
 	var/obj/structure/machinery/paraform_cooler/CU
 
@@ -124,6 +134,10 @@
 	CU.freezer = src
 	CU.start_processing()
 	. = ..()
+
+/obj/structure/closet/secure_closet/freezer/industry/Destroy()
+	QDEL_NULL(CU)
+	return ..()
 
 /obj/structure/machinery/paraform_cooler
 	var/cooldown = 5

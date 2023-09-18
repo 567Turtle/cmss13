@@ -6,12 +6,12 @@ on:
 jobs:
   generate_documentation:
     if: "!contains(github.event.head_commit.message, '[ci skip]')"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     concurrency: gen-docs
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Setup cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/SpacemanDMM
           key: ${{ runner.os }}-spacemandmm-${{ secrets.CACHE_PURGE_KEY }}
@@ -21,7 +21,7 @@ jobs:
         run: |
           ~/dmdoc
           touch dmdoc/.nojekyll
-          echo codedocs.tgstation13.org > dmdoc/CNAME
+          echo docs.cm-ss13.com > dmdoc/CNAME
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@3.7.1
         with:

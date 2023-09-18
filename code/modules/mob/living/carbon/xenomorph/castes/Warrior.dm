@@ -5,7 +5,7 @@
 	melee_damage_lower = XENO_DAMAGE_TIER_3
 	melee_damage_upper = XENO_DAMAGE_TIER_5
 	melee_vehicle_damage = XENO_DAMAGE_TIER_5
-	max_health = XENO_HEALTH_TIER_5
+	max_health = XENO_HEALTH_TIER_6
 	plasma_gain = XENO_PLASMA_GAIN_TIER_9
 	plasma_max = XENO_NO_PLASMA
 	xeno_explosion_resistance = XENO_EXPLOSIVE_ARMOR_TIER_4
@@ -27,46 +27,52 @@
 
 	heal_resting = 1.4
 
-/mob/living/carbon/Xenomorph/Warrior
+	minimum_evolve_time = 9 MINUTES
+
+	minimap_icon = "warrior"
+
+/mob/living/carbon/xenomorph/warrior
 	caste_type = XENO_CASTE_WARRIOR
 	name = XENO_CASTE_WARRIOR
-	desc = "A beefy, alien with an armored carapace."
-	icon = 'icons/mob/hostiles/warrior.dmi'
+	desc = "A beefy alien with an armored carapace."
+	icon = 'icons/mob/xenos/warrior.dmi'
 	icon_size = 64
 	icon_state = "Warrior Walking"
 	plasma_types = list(PLASMA_CATECHOLAMINE)
 	pixel_x = -16
 	old_x = -16
 	tier = 2
-	pull_speed = 2.0 // about what it was before, slightly faster
+	pull_speed = 2 // about what it was before, slightly faster
 
 	base_actions = list(
 		/datum/action/xeno_action/onclick/xeno_resting,
 		/datum/action/xeno_action/onclick/regurgitate,
 		/datum/action/xeno_action/watch_xeno,
+		/datum/action/xeno_action/activable/tail_stab,
 		/datum/action/xeno_action/activable/warrior_punch,
 		/datum/action/xeno_action/activable/lunge,
 		/datum/action/xeno_action/activable/fling,
+		/datum/action/xeno_action/onclick/tacmap,
 	)
 
 	mutation_type = WARRIOR_NORMAL
 	claw_type = CLAW_TYPE_SHARP
-	icon_xeno = 'icons/mob/hostiles/warrior.dmi'
+	icon_xeno = 'icons/mob/xenos/warrior.dmi'
 	icon_xenonid = 'icons/mob/xenonids/warrior.dmi'
 
 	var/lunging = FALSE // whether or not the warrior is currently lunging (holding) a target
-/mob/living/carbon/Xenomorph/Warrior/throw_item(atom/target)
+/mob/living/carbon/xenomorph/warrior/throw_item(atom/target)
 	toggle_throw_mode(THROW_MODE_OFF)
 
-/mob/living/carbon/Xenomorph/Warrior/stop_pulling()
+/mob/living/carbon/xenomorph/warrior/stop_pulling()
 	if(isliving(pulling) && lunging)
 		lunging = FALSE // To avoid extreme cases of stopping a lunge then quickly pulling and stopping to pull someone else
 		var/mob/living/lunged = pulling
-		lunged.SetStunned(0)
-		lunged.SetKnockeddown(0)
+		lunged.set_effect(0, STUN)
+		lunged.set_effect(0, WEAKEN)
 	return ..()
 
-/mob/living/carbon/Xenomorph/Warrior/start_pulling(atom/movable/AM, lunge)
+/mob/living/carbon/xenomorph/warrior/start_pulling(atom/movable/AM, lunge)
 	if (!check_state() || agility)
 		return FALSE
 
@@ -82,24 +88,24 @@
 	. = ..(L, lunge, should_neckgrab)
 
 	if(.) //successful pull
-		if(isXeno(L))
-			var/mob/living/carbon/Xenomorph/X = L
+		if(isxeno(L))
+			var/mob/living/carbon/xenomorph/X = L
 			if(X.tier >= 2) // Tier 2 castes or higher immune to warrior grab stuns
 				return .
 
 		if(should_neckgrab && L.mob_size < MOB_SIZE_BIG)
 			L.drop_held_items()
-			L.KnockDown(get_xeno_stun_duration(L, 2))
+			L.apply_effect(get_xeno_stun_duration(L, 2), WEAKEN)
 			L.pulledby = src
 			visible_message(SPAN_XENOWARNING("\The [src] grabs [L] by the throat!"), \
 			SPAN_XENOWARNING("You grab [L] by the throat!"))
 			lunging = TRUE
-			addtimer(CALLBACK(src, .proc/stop_lunging), get_xeno_stun_duration(L, 2) SECONDS + 1 SECONDS)
+			addtimer(CALLBACK(src, PROC_REF(stop_lunging)), get_xeno_stun_duration(L, 2) SECONDS + 1 SECONDS)
 
-/mob/living/carbon/Xenomorph/Warrior/proc/stop_lunging(var/world_time)
+/mob/living/carbon/xenomorph/warrior/proc/stop_lunging(world_time)
 	lunging = FALSE
 
-/mob/living/carbon/Xenomorph/Warrior/hitby(atom/movable/AM)
+/mob/living/carbon/xenomorph/warrior/hitby(atom/movable/AM)
 	if(ishuman(AM))
 		return
 	..()
@@ -107,29 +113,46 @@
 /datum/behavior_delegate/warrior_base
 	name = "Base Warrior Behavior Delegate"
 
-	var/stored_shield_max = 100
-	var/stored_shield_per_slash = 25
-	var/datum/component/shield_component
+	var/lifesteal_percent = 7
+	var/max_lifesteal = 9
+	var/lifesteal_range =  3 // Marines within 3 tiles of range will give the warrior extra health
+	var/lifesteal_lock_duration = 20 // This will remove the glow effect on warrior after 2 seconds
+	var/color = "#6c6f24"
+	var/emote_cooldown = 0
 
-/datum/behavior_delegate/warrior_base/New()
-	. = ..()
+/datum/behavior_delegate/warrior_base/melee_attack_additional_effects_target(mob/living/carbon/A)
+	..()
 
-/datum/behavior_delegate/warrior_base/add_to_xeno()
-	. = ..()
-	if(!shield_component)
-		shield_component = bound_xeno.AddComponent(\
-			/datum/component/shield_slash,\
-			stored_shield_max,\
-			stored_shield_per_slash,\
-			"Warrior Shield")
-	else
-		bound_xeno.TakeComponent(shield_component)
+	if(SEND_SIGNAL(bound_xeno, COMSIG_XENO_PRE_HEAL) & COMPONENT_CANCEL_XENO_HEAL)
+		return
 
-/datum/behavior_delegate/warrior_base/remove_from_xeno()
-	bound_xeno.remove_xeno_shield()
-	shield_component.RemoveComponent()
-	return ..()
+	var/final_lifesteal = lifesteal_percent
+	var/list/mobs_in_range = oviewers(lifesteal_range, bound_xeno)
 
-/datum/behavior_delegate/warrior_base/Destroy(force, ...)
-	qdel(shield_component)
-	return ..()
+	for(var/mob/mob as anything in mobs_in_range)
+		if(final_lifesteal >= max_lifesteal)
+			break
+
+		if(mob.stat == DEAD || HAS_TRAIT(mob, TRAIT_NESTED))
+			continue
+
+		if(bound_xeno.can_not_harm(mob))
+			continue
+
+		final_lifesteal++
+
+// This part is then outside the for loop
+		if(final_lifesteal >= max_lifesteal)
+			bound_xeno.add_filter("empower_rage", 1, list("type" = "outline", "color" = color, "size" = 1, "alpha" = 90))
+			bound_xeno.visible_message(SPAN_DANGER("[bound_xeno.name] glows as it heals even more from its injuries!."), SPAN_XENODANGER("You glow as you heal even more from your injuries!"))
+			bound_xeno.flick_heal_overlay(2 SECONDS, "#00B800")
+		if(istype(bound_xeno) && world.time > emote_cooldown && bound_xeno)
+			bound_xeno.emote("roar")
+			bound_xeno.xeno_jitter(1 SECONDS)
+			emote_cooldown = world.time + 5 SECONDS
+		addtimer(CALLBACK(src, PROC_REF(lifesteal_lock)), lifesteal_lock_duration/2)
+
+	bound_xeno.gain_health(Clamp(final_lifesteal / 100 * (bound_xeno.maxHealth - bound_xeno.health), 20, 40))
+
+/datum/behavior_delegate/warrior_base/proc/lifesteal_lock()
+	bound_xeno.remove_filter("empower_rage")

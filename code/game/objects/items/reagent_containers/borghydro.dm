@@ -13,7 +13,7 @@
 	var/charge_tick = 0
 	var/recharge_time = 2 SECONDS //Time it takes for shots to recharge
 
-	var/list/reagent_ids = list("tricordrazine", "bicaridine", "kelotane", "dexalinp", "anti_toxin", "inaprovaline", "tramadol", "imidazoline", "spaceacillin", "quickclot")
+	var/list/reagent_ids = list("tricordrazine", "bicaridine", "kelotane", "dexalinp", "anti_toxin", "inaprovaline", "tramadol", "imidazoline", "spaceacillin")
 	var/list/reagent_volumes = list()
 	var/list/reagent_names = list()
 
@@ -77,10 +77,10 @@
 	playsound(src.loc, 'sound/effects/pop.ogg', 15, 0)
 	return
 
-/obj/item/reagent_container/borghypo/examine(mob/user)
-	..()
+/obj/item/reagent_container/borghypo/get_examine_text(mob/user)
+	. = ..()
 	if (user != loc) return
 
 	var/datum/reagent/R = chemical_reagents_list[reagent_ids[mode]]
 
-	to_chat(user, SPAN_NOTICE("It is currently producing [R.name] and has [reagent_volumes[reagent_ids[mode]]] out of [volume] units left."))
+	. += SPAN_NOTICE("It is currently producing [R.name] and has [reagent_volumes[reagent_ids[mode]]] out of [volume] units left.")

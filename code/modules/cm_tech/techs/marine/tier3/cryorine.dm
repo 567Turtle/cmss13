@@ -1,16 +1,16 @@
 
 /datum/tech/repeatable/cryomarine
-	name = "Wake up additional troops"
+	name = "Wake Up Additional Troops"
 	desc = "Wakes up additional troops to fight against any threats."
 	icon_state = "cryotroops"
 
 	announce_name = "ALMAYER SPECIAL ASSETS AUTHORIZED"
 	announce_message = "Additional troops are being taken out of cryo."
 
-	required_points = 10
-	increase_per_purchase = 10
+	required_points = 6
+	increase_per_purchase = 6
 
-	tech_flags =  TECH_FLAG_DISABLED
+	flags = TREE_FLAG_MARINE
 	tier = /datum/tier/three
 
 /datum/tech/repeatable/cryomarine/can_unlock(mob/M)
@@ -23,4 +23,4 @@
 
 /datum/tech/repeatable/cryomarine/on_unlock()
 	. = ..()
-	SSticker.mode.get_specific_call("Marine Cryo Reinforcements (Squad)", FALSE, FALSE)
+	SSticker.mode.get_specific_call("Marine Cryo Reinforcements (Tech)", TRUE, FALSE, FALSE, announce_dispatch_message = FALSE)

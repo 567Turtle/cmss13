@@ -1,11 +1,12 @@
 /obj/item/device/assembly/igniter
 	name = "igniter"
-	desc = "A small electronic device able to ignite combustable substances."
+	desc = "A small electronic device able to ignite combustible substances."
 	icon_state = "igniter"
 	matter = list("metal" = 500, "glass" = 50, "waste" = 10)
 	wires = WIRE_ASSEMBLY_RECEIVE
 	secured = FALSE
 	heat_source = 1000 //Can ignite Thermite.
+	flags_item = IGNITING_ITEM
 
 /obj/item/device/assembly/igniter/activate()
 	if(!..())
@@ -22,7 +23,7 @@
 			if(tank && !tank.exploding)
 				playsound(get_turf(tank), 'sound/machines/twobeep.ogg', 75, 1)
 				tank.exploding = TRUE
-				addtimer(CALLBACK(tank, /obj/structure/reagent_dispensers/fueltank/.proc/explode), 3 SECONDS)
+				addtimer(CALLBACK(tank, TYPE_PROC_REF(/obj/structure/reagent_dispensers/fueltank, explode)), 3 SECONDS)
 
 				tank.update_icon()
 

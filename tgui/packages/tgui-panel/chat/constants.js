@@ -33,6 +33,8 @@ export const MESSAGE_TYPE_ADMINPM = 'adminpm';
 export const MESSAGE_TYPE_COMBAT = 'combat';
 export const MESSAGE_TYPE_ADMINCHAT = 'adminchat';
 export const MESSAGE_TYPE_MODCHAT = 'modchat';
+export const MESSAGE_TYPE_MENTOR = 'mentor';
+export const MESSAGE_TYPE_STAFF_IC = 'staff_ic';
 export const MESSAGE_TYPE_EVENTCHAT = 'eventchat';
 export const MESSAGE_TYPE_ADMINLOG = 'adminlog';
 export const MESSAGE_TYPE_ATTACKLOG = 'attacklog';
@@ -53,7 +55,8 @@ export const MESSAGE_TYPES = [
     type: MESSAGE_TYPE_LOCALCHAT,
     name: 'Local',
     description: 'In-character local messages (say, emote, etc)',
-    selector: '.say, .emote, .say_quote, .german, .rough, .japanese, .monkey, .vox, .changeling, .soghun, .tajaran, .xenotalk',
+    selector:
+      '.say, .emote, .say_quote, .german, .rough, .japanese, .monkey, .vox, .changeling, .soghun, .tajaran, .xenotalk',
   },
   {
     type: MESSAGE_TYPE_RADIO,
@@ -65,13 +68,15 @@ export const MESSAGE_TYPES = [
     type: MESSAGE_TYPE_INFO,
     name: 'Info',
     description: 'Non-urgent messages from the game and items',
-    selector: '.notice:not(.pm), .adminnotice, .info, .role_body, .role_header, .event_announcement, .announce_header, .announce_header_blue, .announce_body, .sinister, .cult, .xenonotice, .xenoannounce, .yautjabold, .yautjaboldbig',
+    selector:
+      '.notice:not(.pm), .adminnotice, .info, .role_body, .role_header, .event_announcement, .announce_header, .announce_header_blue, .announce_body, .sinister, .cult, .xenonotice, .xenoannounce, .yautjabold, .yautjaboldbig',
   },
   {
     type: MESSAGE_TYPE_WARNING,
     name: 'Warnings',
     description: 'Urgent messages from the game and items',
-    selector: '.warning:not(.pm), .critical, .userdanger, .italics, .xenowarning, .xenominorwarning',
+    selector:
+      '.warning:not(.pm), .critical, .userdanger, .italics, .xenowarning, .xenominorwarning',
   },
   {
     type: MESSAGE_TYPE_DEADCHAT,
@@ -95,7 +100,8 @@ export const MESSAGE_TYPES = [
     type: MESSAGE_TYPE_COMBAT,
     name: 'Combat Log',
     description: 'Urist McTraitor has stabbed you with a knife!',
-    selector: '.danger, .moderate, .disarm, .attack, .passive, .xenodanger, .xenohighdanger, .highdanger, .avoidharm',
+    selector:
+      '.danger, .moderate, .disarm, .attack, .passive, .xenodanger, .xenohighdanger, .highdanger, .avoidharm',
   },
   {
     type: MESSAGE_TYPE_HELPFUL,
@@ -108,19 +114,26 @@ export const MESSAGE_TYPES = [
     name: 'Unsorted',
     description: 'Everything we could not sort, always enabled',
   },
+  {
+    type: MESSAGE_TYPE_STAFF_IC,
+    name: 'Staff IC',
+    description: 'IC interaction with staff',
+    selector: '.staff_ic',
+  },
   // Admin stuff
   {
     type: MESSAGE_TYPE_ADMINCHAT,
     name: 'Admin Chat',
     description: 'ASAY messages',
-    selector: '.admin_channel, .adminsay, .headminsay',
+    selector:
+      '.admin_channel, .adminsay, .headminsay, .mod_channel, .mod, .adminmod, .staffsay',
     admin: true,
   },
   {
-    type: MESSAGE_TYPE_MODCHAT,
-    name: 'Mod Chat',
-    description: 'MSAY messages',
-    selector: '.mod_channel, .mod, .adminmod, .mentorsay, .staffsay',
+    type: MESSAGE_TYPE_MENTOR,
+    name: 'Mentor',
+    description: 'Mentor Chat, Mhelps',
+    selector: '.mentorsay, .mentorhelp, .mentorbody, .mentorstaff',
     admin: true,
   },
   {

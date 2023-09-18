@@ -4,37 +4,9 @@
 	icon_state = "demo_sim"
 	exproof = TRUE
 	unacidable = TRUE
+	var/datum/simulator/simulation
+	var/turf/sim_location
 	var/obj/item/configuration
-	var/obj/structure/machinery/camera/simulation/simulation
-	var/cooling = FALSE
-
-/obj/effect/landmark/sim_target
-	name = "simulator_target"
-
-/obj/effect/landmark/sim_target/Initialize(mapload, ...)
-	. = ..()
-	GLOB.simulator_targets += src
-
-/obj/effect/landmark/sim_target/Destroy()
-	GLOB.simulator_targets -= src
-	return ..()
-
-/obj/effect/landmark/sim_camera
-	name = "simulator_camera"
-	color = "#FFFF00";
-
-/obj/effect/landmark/sim_camera/Initialize(mapload, ...)
-	. = ..()
-	GLOB.simulator_cameras += src
-
-/obj/effect/landmark/sim_camera/Destroy()
-	GLOB.simulator_cameras -= src
-	return ..()
-
-/obj/structure/machinery/computer/demo_sim/examine(mob/user)
-	..()
-	if(cooling)
-		to_chat(user, "Processors are currently cooling.")
 
 /obj/structure/machinery/computer/demo_sim/attackby(obj/item/B, mob/living/user)
 	if(inoperable())
@@ -49,64 +21,97 @@
 		user.drop_held_item(B)
 		B.forceMove(src)
 		configuration = B
-		to_chat(user, "You configure [src] to simulate [B].")
-		start_watching(user)
+		to_chat(user, SPAN_NOTICE("You configure \the [src] to simulate [B]."))
 	else
-		to_chat(user, "[src] is not compatible with [B].")
+		to_chat(user, "\The [src] is not compatible with [B].")
 
 /obj/structure/machinery/computer/demo_sim/attack_hand(mob/user as mob)
+	if(..())
+		return
+
+	tgui_interact(user)
+
+/obj/structure/machinery/computer/demo_sim/Initialize()
+	. = ..()
+	simulation = new()
+
+// DEMOLITIONS TGUI SHIT \\
+
+/obj/structure/machinery/computer/demo_sim/tgui_interact(mob/user, datum/tgui/ui)
+	ui = SStgui.try_update_ui(user, src, ui)
+	if(!ui)
+		ui = new(user, src, "DemoSim", "[src.name]")
+		ui.open()
+
+/obj/structure/machinery/computer/demo_sim/ui_state(mob/user) // we gotta do custom shit here so that it always closes instead of suspending
+	return GLOB.not_incapacitated_and_adjacent_strict_state
+
+/obj/structure/machinery/computer/demo_sim/ui_status(mob/user, datum/ui_state/state)
+	. = ..()
 	if(inoperable())
-		return
-	start_watching(user)
+		return UI_CLOSE
 
-/obj/structure/machinery/computer/demo_sim/proc/start_watching(mob/living/user)
-	if(!simulation)
-		simulation = SAFEPICK(GLOB.simulator_cameras)
-	if(!simulation)
-		to_chat(user, SPAN_WARNING("GPU damaged! Unable to start simulation."))
-		return
-	if(user.client.view != world_view_size)
-		to_chat(user, SPAN_WARNING("You're too busy looking at something else."))
-		return
-	user.reset_view(simulation)
-	check_response(alert(user,"Welcome to the simulation.","[src]","Detonate","Eject","Quit"), user)
+/obj/structure/machinery/computer/demo_sim/ui_data(mob/user)
+	var/list/data = list()
 
-/obj/structure/machinery/computer/demo_sim/proc/stop_watching(mob/living/user)
-	user.unset_interaction()
-	user.reset_view(null)
-	user.cameraFollow = null
+	data["configuration"] = configuration
+	data["looking"] = simulation.looking_at_simulation
+	data["dummy_mode"] = simulation.dummy_mode
 
-/obj/structure/machinery/computer/demo_sim/proc/check_response(var/response, mob/living/user)
-	switch(response)
-		if("Detonate")
-			if(cooling)
-				to_chat(user, SPAN_WARNING("Processors are cooling down"))
-				stop_watching(user)
-				return
-			if(!configuration)
-				to_chat(user, SPAN_NOTICE("No configuration set."))
-				stop_watching(user)
-				return
-			simulate_detonation()
-			check_response(alert(user,"Simulation for [configuration].","[src]","Detonate","Eject","Quit"), user)
-		if("Quit")
-			stop_watching(user)
-		if("Eject")
+	data["worldtime"] = world.time
+	data["nextdetonationtime"] = simulation.detonation_cooldown
+	data["detonation_cooldown"] = simulation.detonation_cooldown_time
+
+	return data
+
+/obj/structure/machinery/computer/demo_sim/ui_act(action, list/params, datum/tgui/ui, datum/ui_state/state)
+	. = ..()
+	if(.)
+		return
+
+	var/user = ui.user
+
+	switch(action)
+		if("start_watching")
+			simulation.start_watching(user)
+			. = TRUE
+
+		if("stop_watching")
+			simulation.stop_watching(user)
+			. = TRUE
+
+		if("eject")
 			if(configuration)
 				configuration.forceMove(loc)
 				configuration = null
 			else
 				to_chat(user, SPAN_NOTICE("Nothing to eject."))
-			stop_watching(user)
+			. = TRUE
 
-/obj/structure/machinery/computer/demo_sim/proc/simulate_detonation()
-	cooling = TRUE
+		if("detonate")
+			if(!configuration)
+				to_chat(user, SPAN_NOTICE("No configuration set."))
+				return
+			simulate_detonation(user)
+			. = TRUE
 
-	for(var/spawn_loc in GLOB.simulator_targets)
-		var/mob/living/carbon/human/dummy = new /mob/living/carbon/human(get_turf(spawn_loc))
-		dummy.name = "simulated human"
-		QDEL_IN(dummy,1 MINUTES)
+		if("switchmode")
+			simulation.dummy_mode = tgui_input_list(user, "Select target type to simulate", "Target type", simulation.target_types, 30 SECONDS)
+			if(!simulation.dummy_mode)
+				simulation.dummy_mode = /mob/living/carbon/human
+			. = TRUE
 
+/obj/structure/machinery/computer/demo_sim/ui_close(mob/user)
+
+	. = ..()
+	if(simulation.looking_at_simulation)
+		simulation.stop_watching(user)
+
+// DEMOLITIONS TGUI SHIT END \\
+
+
+/obj/structure/machinery/computer/demo_sim/proc/simulate_detonation(mob/living/user)
+	simulation.spawn_mobs(user)
 	//Simply an explosive
 	if(istype(configuration,/obj/item/explosive))
 		make_and_prime_explosive(configuration)
@@ -117,23 +122,18 @@
 			if(O.warhead)
 				make_and_prime_explosive(O.warhead)
 		else
-			var/obj/item/mortar_shell/O = new configuration.type(simulation.loc)
-			O.detonate(simulation.loc)
+			var/obj/item/mortar_shell/O = new configuration.type(get_turf(simulation.sim_camera))
+			O.detonate(get_turf(simulation.sim_camera))
 	//Rockets (custom only because projectiles are spaghetti)
 	else if(istype(configuration,/obj/item/ammo_magazine/rocket/custom))
 		var/obj/item/ammo_magazine/rocket/custom/O = configuration
 		if(O.warhead)
 			make_and_prime_explosive(O.warhead)
 
-	addtimer(CALLBACK(src, .proc/stop_cooling), 2 MINUTES, TIMER_UNIQUE)
-
-/obj/structure/machinery/computer/demo_sim/proc/make_and_prime_explosive(var/obj/item/explosive/O)
-	var/obj/item/explosive/E = new O.type(simulation.loc)
+/obj/structure/machinery/computer/demo_sim/proc/make_and_prime_explosive(obj/item/explosive/O)
+	var/obj/item/explosive/E = new O.type(get_turf(simulation.sim_camera))
 	E.make_copy_of(O)
 	E.prime(TRUE)
-	var/turf/sourceturf = get_turf(simulation)
-	sourceturf.chemexploded = FALSE //Make sure that this actually resets
+	sim_location = get_turf(simulation.sim_camera)
+	sim_location.chemexploded = FALSE //Make sure that this actually resets
 	QDEL_IN(E,1 MINUTES)
-
-/obj/structure/machinery/computer/demo_sim/proc/stop_cooling()
-	cooling = FALSE

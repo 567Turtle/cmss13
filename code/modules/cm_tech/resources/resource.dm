@@ -37,7 +37,7 @@
 /obj/structure/resource_node/area_controller
 	is_area_controller = TRUE
 
-/obj/structure/resource_node/Initialize(mapload, var/play_ambient_noise = TRUE)
+/obj/structure/resource_node/Initialize(mapload, play_ambient_noise = TRUE)
 	. = ..()
 	bound_width = width * world.icon_size
 	bound_height = height * world.icon_size
@@ -54,6 +54,12 @@
 
 		controlled_area = A
 		A.r_node = src
+
+/obj/structure/resource_node/Destroy()
+	if(controlled_area && controlled_area.r_node == src)
+		controlled_area.r_node = null
+	controlled_area = null
+	return ..()
 
 /obj/structure/resource_node/initialize_pass_flags(datum/pass_flags_container/PF)
 	. = ..()
@@ -75,11 +81,11 @@
 	STOP_PROCESSING(SSobj, src)
 	update_icon()
 
-/obj/structure/resource_node/proc/take_damage(var/damage)
+/obj/structure/resource_node/proc/take_damage(damage)
 	health = Clamp(health - damage, 0, max_health)
 	healthcheck()
 
-/obj/structure/resource_node/bullet_act(obj/item/projectile/P)
+/obj/structure/resource_node/bullet_act(obj/projectile/P)
 	take_damage(P.damage)
 
 /obj/structure/resource_node/ex_act(severity, direction)
@@ -113,9 +119,9 @@
 /obj/structure/resource_node/get_projectile_hit_boolean()
 	return TRUE
 
-/obj/structure/resource_node/examine(mob/user)
+/obj/structure/resource_node/get_examine_text(mob/user)
 	. = ..()
-	to_chat(user, SPAN_BLUE("Health: [health]/[max_health]"))
+	. += SPAN_BLUE("Health: [health]/[max_health]")
 
 
 /obj/structure/resource_node/attackby(obj/item/W, mob/user)
@@ -146,8 +152,8 @@
 	H.visible_message(SPAN_DANGER("[H] sets up [src]."),\
 	SPAN_NOTICE("You set up [src]."), max_distance = 3)
 
-/obj/structure/resource_node/attack_alien(mob/living/carbon/Xenomorph/M)
-	if(!isXenoBuilder(M))
+/obj/structure/resource_node/attack_alien(mob/living/carbon/xenomorph/M)
+	if(!isxeno_builder(M))
 		to_chat(M, SPAN_XENOWARNING("You can't build onto [src]."))
 		return XENO_NO_DELAY_ACTION
 

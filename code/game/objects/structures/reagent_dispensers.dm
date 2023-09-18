@@ -3,8 +3,8 @@
 	desc = "..."
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "watertank"
-	density = 1
-	anchored = 0
+	density = TRUE
+	anchored = FALSE
 	health = 100 // Can be destroyed in 2-4 slashes.
 	flags_atom = CAN_BE_SYRINGED
 	wrenchable = TRUE
@@ -14,9 +14,6 @@
 	var/chemical = ""
 	var/dispensing = TRUE
 
-/obj/structure/reagent_dispensers/attackby(obj/item/W as obj, mob/user as mob)
-	return
-
 /obj/structure/reagent_dispensers/Initialize(mapload, reagent_amount = 1000)
 	. = ..()
 	create_reagents(reagent_amount)
@@ -25,20 +22,27 @@
 	if(chemical)
 		reagents.add_reagent(chemical, reagent_amount)
 
-/obj/structure/reagent_dispensers/initialize_pass_flags(var/datum/pass_flags_container/PF)
+/obj/structure/reagent_dispensers/initialize_pass_flags(datum/pass_flags_container/PF)
 	..()
 	if (PF)
 		PF.flags_can_pass_all = PASS_OVER|PASS_AROUND|PASS_UNDER
 
-/obj/structure/reagent_dispensers/examine(mob/user)
-	..()
+/obj/structure/reagent_dispensers/get_examine_text(mob/user)
+	. = ..()
 	if(get_dist(user, src) > 2 && user != loc) return
-	to_chat(user, SPAN_NOTICE(" It contains:"))
+	. += SPAN_NOTICE("It contains:")
 	if(reagents && reagents.reagent_list.len)
 		for(var/datum/reagent/R in reagents.reagent_list)
-			to_chat(user, SPAN_NOTICE(" [R.volume] units of [R.name]"))
+			. += SPAN_NOTICE(" [R.volume] units of [R.name]")
 	else
-		to_chat(user, SPAN_NOTICE(" Nothing."))
+		. += SPAN_NOTICE(" Nothing.")
+	if(reagents)
+		. += SPAN_NOTICE("Total volume: [reagents.total_volume] / [reagents.maximum_volume].")
+	if(dispensing)
+		. += SPAN_NOTICE("\nTransfer mode: Dispensing")
+	else
+		. += SPAN_NOTICE("\nTransfer mode: Filling")
+	. += SPAN_NOTICE("Transfer rate: [amount_per_transfer_from_this] units")
 
 /obj/structure/reagent_dispensers/Destroy()
 	playsound(src.loc, 'sound/effects/slosh.ogg', 50, 1, 3)
@@ -62,18 +66,18 @@
 
 /obj/structure/reagent_dispensers/proc/healthcheck()
 	if(health <= 0)
-		qdel(src)
+		deconstruct(FALSE)
 
-/obj/structure/reagent_dispensers/bullet_act(var/obj/item/projectile/Proj)
+/obj/structure/reagent_dispensers/bullet_act(obj/projectile/Proj)
 	health -= Proj.damage
 	if(Proj.firer)
-		msg_admin_niche("[key_name_admin(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]) (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];adminplayerobservecoodjump=1;X=[loc.x];Y=[loc.y];Z=[loc.z]'>JMP</a>).")
+		msg_admin_niche("[key_name_admin(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]) [ADMIN_JMP(loc)].")
 		log_game("[key_name(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]).")
 	playsound(src, 'sound/effects/metalhit.ogg', 25, 1)
 	healthcheck()
 	return TRUE
 
-/obj/structure/reagent_dispensers/attack_alien(mob/living/carbon/Xenomorph/user)
+/obj/structure/reagent_dispensers/attack_alien(mob/living/carbon/xenomorph/user)
 	if(unslashable)
 		return XENO_NO_DELAY_ACTION
 	user.animation_attack_on(src)
@@ -106,16 +110,14 @@
 	switch(severity)
 		if(0 to EXPLOSION_THRESHOLD_LOW)
 			if(prob(5))
-				new /obj/effect/particle_effect/water(src.loc)
-				qdel(src)
+				deconstruct(FALSE)
 				return
 		if(EXPLOSION_THRESHOLD_LOW to EXPLOSION_THRESHOLD_MEDIUM)
 			if(prob(50))
-				new /obj/effect/particle_effect/water(src.loc)
-				qdel(src)
+				deconstruct(FALSE)
 				return
 		if(EXPLOSION_THRESHOLD_MEDIUM to INFINITY)
-			qdel(src)
+			deconstruct(FALSE)
 			return
 		else
 	return
@@ -128,24 +130,29 @@
 	if(N)
 		amount_per_transfer_from_this = N
 
+/obj/structure/reagent_dispensers/attackby(obj/item/hit_item, mob/living/user)
+	if(istype(hit_item, /obj/item/reagent_container))
+		return
+	..()
+
 //Dispensers
 /obj/structure/reagent_dispensers/watertank
 	name = "watertank"
-	desc = "A watertank"
+	desc = "A water tank"
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "watertank"
 	chemical = "water"
 
 /obj/structure/reagent_dispensers/ammoniatank
 	name = "ammoniatank"
-	desc = "An ammoniatank"
+	desc = "An ammonia tank"
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "ammoniatank"
 	chemical = "ammonia"
 
 /obj/structure/reagent_dispensers/oxygentank
 	name = "oxygentank"
-	desc = "An oxygentank"
+	desc = "An oxygen tank"
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "oxygentank"
 	chemical = "oxygen"
@@ -159,7 +166,7 @@
 
 /obj/structure/reagent_dispensers/pacidtank
 	name = "polytrinic acid tank"
-	desc = "A polytrinic acidtank"
+	desc = "A polytrinic acid tank"
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "pacidtank"
 	chemical = "pacid"
@@ -173,26 +180,28 @@
 
 /obj/structure/reagent_dispensers/fueltank
 	name = "fueltank"
-	desc = "A fueltank"
+	desc = "A fuel tank"
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "weldtank"
 	amount_per_transfer_from_this = 10
 	chemical = "fuel"
+	black_market_value = 25
 	var/modded = 0
 	var/obj/item/device/assembly_holder/rig = null
 	var/exploding = 0
 	var/reinforced = FALSE
 	var/datum/weakref/source_mob
 
-/obj/structure/reagent_dispensers/fueltank/examine(mob/user)
-	..()
-	if(user != loc) return
+/obj/structure/reagent_dispensers/fueltank/get_examine_text(mob/user)
+	. = ..()
+	if(user != loc)
+		return
 	if(modded)
-		to_chat(user, SPAN_DANGER("Fuel faucet is wrenched open, leaking the fuel!"))
+		. += SPAN_DANGER("The fuel faucet is wrenched open, leaking the fuel!")
 	if(rig)
-		to_chat(user, SPAN_NOTICE("There is some kind of device rigged to the tank."))
+		. += SPAN_NOTICE("There is some kind of device rigged to the tank.")
 	if(reinforced)
-		to_chat(user, SPAN_NOTICE("It seems to be reinforced with metal shielding."))
+		. += SPAN_NOTICE("It seems to be reinforced with metal shielding.")
 
 /obj/structure/reagent_dispensers/fueltank/attack_hand()
 	if(rig)
@@ -217,7 +226,7 @@
 			"You wrench [src]'s faucet [modded ? "closed" : "open"]")
 		modded = modded ? 0 : 1
 		if (modded)
-			message_admins("[key_name_admin(user)] opened fueltank at [loc.loc.name] ([loc.x],[loc.y],[loc.z]), leaking fuel. (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];adminplayerobservecoodjump=1;X=[loc.x];Y=[loc.y];Z=[loc.z]'>JMP</a>)")
+			message_admins("[key_name_admin(user)] opened fueltank at [loc.loc.name] ([loc.x],[loc.y],[loc.z]), leaking fuel. [ADMIN_JMP(loc)]")
 			log_game("[key_name(user)] opened fueltank at [loc.loc.name] ([loc.x],[loc.y],[loc.z]), leaking fuel.")
 			leak_fuel(amount_per_transfer_from_this)*/
 	if(istype(W,/obj/item/device/assembly_holder))
@@ -239,7 +248,7 @@
 
 		var/obj/item/device/assembly_holder/H = W
 		if (istype(H.a_left,/obj/item/device/assembly/igniter) || istype(H.a_right,/obj/item/device/assembly/igniter))
-			msg_admin_niche("[key_name_admin(user)] rigged [name] at [loc.loc.name] ([loc.x],[loc.y],[loc.z]) for explosion. (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];adminplayerobservecoodjump=1;X=[loc.x];Y=[loc.y];Z=[loc.z]'>JMP</a>)")
+			msg_admin_niche("[key_name_admin(user)] rigged [name] at [loc.loc.name] ([loc.x],[loc.y],[loc.z]) for explosion. [ADMIN_JMP(loc)]")
 			log_game("[key_name(user)] rigged [name] at [loc.loc.name] ([loc.x],[loc.y],[loc.z]) for explosion.")
 
 		rig = W
@@ -287,14 +296,14 @@
 	return ..()
 
 
-/obj/structure/reagent_dispensers/fueltank/bullet_act(var/obj/item/projectile/Proj)
+/obj/structure/reagent_dispensers/fueltank/bullet_act(obj/projectile/Proj)
 	if(exploding) return 0
 	if(ismob(Proj.firer))
 		source_mob = WEAKREF(Proj.firer)
 
 	if(Proj.damage > 10 && prob(60) && !reinforced)
 		if(Proj.firer)
-			message_staff("[key_name_admin(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]) (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];adminplayerobservecoodjump=1;X=[loc.x];Y=[loc.y];Z=[loc.z]'>JMP</a>).")
+			message_admins("[key_name_admin(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]) [ADMIN_JMP(loc)].")
 			log_game("[key_name(Proj.firer)] fired a projectile at [name] in [loc.loc.name] ([loc.x],[loc.y],[loc.z]).")
 		exploding = TRUE
 		explode()
@@ -314,17 +323,17 @@
 	if(src)
 		return ..()
 
-/obj/structure/reagent_dispensers/fueltank/proc/explode(var/force)
+/obj/structure/reagent_dispensers/fueltank/proc/explode(force)
 	reagents.source_mob = source_mob
 	if(reagents.handle_volatiles() || force)
-		qdel(src)
+		deconstruct(FALSE)
 		return
 
 	exploding = FALSE
 	update_icon()
 
 
-/obj/structure/reagent_dispensers/fueltank/update_icon(var/cut_overlays = TRUE)
+/obj/structure/reagent_dispensers/fueltank/update_icon(cut_overlays = TRUE)
 	if(cut_overlays)
 		overlays.Cut()
 	. = ..()
@@ -361,12 +370,12 @@
 
 /obj/structure/reagent_dispensers/fueltank/flamer_fire_act(damage, datum/cause_data/flame_cause_data)
 	if(!reinforced)
-		reagents.source_mob = flame_cause_data.weak_mob
+		reagents.source_mob = flame_cause_data?.weak_mob
 		explode()
 
 /obj/structure/reagent_dispensers/fueltank/gas
 	name = "gastank"
-	desc = "A gastank"
+	desc = "A gas tank"
 
 /obj/structure/reagent_dispensers/fueltank/gas/leak_fuel(amount)
 	if(reagents.total_volume == 0)
@@ -377,13 +386,13 @@
 
 /obj/structure/reagent_dispensers/fueltank/gas/methane
 	name = "methanetank"
-	desc = "A methanetank"
+	desc = "A methane tank"
 	icon_state = "methanetank"
 	chemical = "methane"
 
 /obj/structure/reagent_dispensers/fueltank/gas/hydrogen
 	name = "hydrogentank"
-	desc = "A hydrogentank"
+	desc = "A hydrogen tank"
 	icon_state = "hydrogentank"
 	chemical = "hydrogen"
 
@@ -392,6 +401,7 @@
 	desc = "A reagent tank, typically used to store large quantities of chemicals."
 
 	chemical = null
+	dispensing = FALSE //Empty fuel tanks start by accepting chemicals by default. Can't dispense nothing!
 	icon_state = "tank_normal"
 
 /obj/structure/reagent_dispensers/fueltank/custom/Initialize(mapload, volume)
@@ -423,8 +433,9 @@
 	desc = "Refill pepper spray canisters."
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "peppertank"
-	anchored = 1
-	density = 0
+	anchored = TRUE
+	wrenchable =  FALSE
+	density = FALSE
 	amount_per_transfer_from_this = 45
 	chemical = "condensedcapsaicin"
 
@@ -435,8 +446,11 @@
 	icon = 'icons/obj/structures/machinery/vending.dmi'
 	icon_state = "water_cooler"
 	possible_transfer_amounts = null
-	anchored = 1
+	anchored = TRUE
 	chemical = "water"
+
+/obj/structure/reagent_dispensers/water_cooler/walk_past
+	density = FALSE
 
 /obj/structure/reagent_dispensers/water_cooler/stacks
 	icon_state = "water_cooler_2"
@@ -461,7 +475,8 @@
 	icon = 'icons/obj/objects.dmi'
 	icon_state = "virusfoodtank"
 	amount_per_transfer_from_this = 10
-	anchored = 1
-	density = 0
+	anchored = TRUE
+	wrenchable = FALSE
+	density = FALSE
 	chemical = "virusfood"
 

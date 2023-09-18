@@ -30,8 +30,8 @@
 
 /obj/item/device/pipe_painter/attack_self(mob/user)
 	..()
-	mode = tgui_input_list(usr, "Which colour do you want to use?", "Pipe painter", modes)
+	mode = tgui_input_list(usr, "Which color do you want to use?", "Pipe painter", modes)
 
-/obj/item/device/pipe_painter/examine(mob/user)
-	..()
-	to_chat(user, "It is in [mode] mode.")
+/obj/item/device/pipe_painter/get_examine_text(mob/user)
+	. = ..()
+	. += "It is in [mode] mode."

@@ -30,6 +30,7 @@
 	var/list/suit_restricted //for uniforms that only accept to be combined with certain suits
 	var/removed_parts = 0
 	var/worn_state = null
+	var/hood_state //for uniforms with hoods.
 	drag_unequip = TRUE
 	valid_accessory_slots = list(ACCESSORY_SLOT_UTILITY, ACCESSORY_SLOT_ARMBAND, ACCESSORY_SLOT_RANK, ACCESSORY_SLOT_DECOR, ACCESSORY_SLOT_MEDAL, ACCESSORY_SLOT_ARMOR_C)
 	restricted_accessory_slots = list(ACCESSORY_SLOT_UTILITY, ACCESSORY_SLOT_ARMBAND, ACCESSORY_SLOT_RANK, ACCESSORY_SLOT_ARMOR_C)
@@ -44,37 +45,44 @@
 	else
 		worn_state = icon_state
 
-	//autodetect rollability
-	if((worn_state + "_d") in icon_states(default_onmob_icons[WEAR_BODY]))
+	var/check_icon = contained_sprite ? icon : default_onmob_icons[WEAR_BODY]
+
+	//autodetect rollability, cuttability, and removability.
+	if(icon_exists(check_icon, "[worn_state]_d[contained_sprite ? "_un" : ""]"))
 		flags_jumpsuit |= UNIFORM_SLEEVE_ROLLABLE
+
 	else if(flags_jumpsuit & UNIFORM_SLEEVE_ROLLABLE)
 		flags_jumpsuit &= ~UNIFORM_SLEEVE_ROLLABLE
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having rollable sleeves but could not detect a rolled icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having rollable sleeves but could not detect a rolled icon state.")
 
-	if((worn_state + "_df") in icon_states(default_onmob_icons[WEAR_BODY]))
+
+	if(icon_exists(check_icon, "[worn_state]_df[contained_sprite ? "_un" : ""]"))
 		flags_jumpsuit |= UNIFORM_SLEEVE_CUTTABLE
+
 	else if(flags_jumpsuit & UNIFORM_SLEEVE_CUTTABLE)
 		flags_jumpsuit &= ~UNIFORM_SLEEVE_CUTTABLE
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having cuttable sleeves but could not detect a cut icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having cuttable sleeves but could not detect a cut icon state.")
 
-	if((worn_state + "_dj") in icon_states(default_onmob_icons[WEAR_BODY]))
+
+	if(icon_exists(check_icon, "[worn_state]_dj[contained_sprite ? "_un" : ""]"))
 		flags_jumpsuit |= UNIFORM_JACKET_REMOVABLE
+
 	else if(flags_jumpsuit & UNIFORM_JACKET_REMOVABLE)
 		flags_jumpsuit &= ~UNIFORM_JACKET_REMOVABLE
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having a removable jacket but could not detect a shirtless icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having a removable jacket but could not detect a shirtless icon state.")
 
 	//autodetect preset states are valid
 	if((flags_jumpsuit & UNIFORM_SLEEVE_ROLLED) && !(flags_jumpsuit & UNIFORM_SLEEVE_ROLLABLE))
 		flags_jumpsuit &= ~UNIFORM_SLEEVE_ROLLED
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having rolled sleeves but could not detect a rolled icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having rolled sleeves but could not detect a rolled icon state.")
 
 	if((flags_jumpsuit & UNIFORM_SLEEVE_CUT) && !(flags_jumpsuit & UNIFORM_SLEEVE_CUTTABLE))
 		flags_jumpsuit &= ~UNIFORM_SLEEVE_CUT
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having cut sleeves but could not detect a cut icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having cut sleeves but could not detect a cut icon state.")
 
 	if((flags_jumpsuit & UNIFORM_JACKET_REMOVED) && !(flags_jumpsuit & UNIFORM_JACKET_REMOVABLE))
 		flags_jumpsuit &= ~UNIFORM_JACKET_REMOVED
-		log_debug("CLOTHING: Jumpsuit of name: \"[src.name]\" and type: \"[src.type]\" was flagged as having a removed jacket but could not detect a shirtless icon state.")
+		log_debug("CLOTHING: Jumpsuit of name: \"[name]\" and type: \"[type]\" was flagged as having a removed jacket but could not detect a shirtless icon state.")
 
 	update_clothing_icon()
 
@@ -110,18 +118,18 @@
 				add_fingerprint(usr)
 
 
-/obj/item/clothing/under/examine(mob/user)
-	..()
+/obj/item/clothing/under/get_examine_text(mob/user)
+	. = ..()
 	if(has_sensor)
 		switch(sensor_mode)
 			if(SENSOR_MODE_OFF)
-				to_chat(user, "Its sensors appear to be disabled.")
+				. += "Its sensors appear to be disabled."
 			if(SENSOR_MODE_BINARY)
-				to_chat(user, "Its binary life sensors appear to be enabled.")
+				. += "Its binary life sensors appear to be enabled."
 			if(SENSOR_MODE_DAMAGE)
-				to_chat(user, "Its vital tracker appears to be enabled.")
+				. += "Its vital tracker appears to be enabled."
 			if(SENSOR_MODE_LOCATION)
-				to_chat(user, "Its vital tracker and tracking beacon appear to be enabled.")
+				. += "Its vital tracker and tracking beacon appear to be enabled."
 
 /obj/item/clothing/under/proc/set_sensors(mob/user)
 	if (istype(user, /mob/dead/)) return
@@ -159,16 +167,16 @@
 		switch(sensor_mode)
 			if(SENSOR_MODE_OFF)
 				for(var/mob/V in viewers(usr, 1))
-					V.show_message(SPAN_DANGER("[user] disables [src.loc]'s remote sensing equipment."), 1)
+					V.show_message(SPAN_DANGER("[user] disables [src.loc]'s remote sensing equipment."), SHOW_MESSAGE_VISIBLE)
 			if(SENSOR_MODE_BINARY)
 				for(var/mob/V in viewers(usr, 1))
-					V.show_message("[user] turns [src.loc]'s remote sensors to binary.", 1)
+					V.show_message("[user] turns [src.loc]'s remote sensors to binary.", SHOW_MESSAGE_VISIBLE)
 			if(SENSOR_MODE_DAMAGE)
 				for(var/mob/V in viewers(usr, 1))
-					V.show_message("[user] sets [src.loc]'s sensors to track vitals.", 1)
+					V.show_message("[user] sets [src.loc]'s sensors to track vitals.", SHOW_MESSAGE_VISIBLE)
 			if(SENSOR_MODE_LOCATION)
 				for(var/mob/V in viewers(usr, 1))
-					V.show_message("[user] sets [src.loc]'s sensors to maximum.", 1)
+					V.show_message("[user] sets [src.loc]'s sensors to maximum.", SHOW_MESSAGE_VISIBLE)
 
 /obj/item/clothing/under/verb/toggle()
 	set name = "Toggle Suit Sensors"
@@ -176,75 +184,23 @@
 	set src in usr
 	set_sensors(usr)
 
-/obj/item/clothing/under/proc/update_rollsuit_status()
-	var/human_bodytype
-	if(sprite_sheets && ishuman(loc))
-		var/mob/living/carbon/human/H = loc
-		human_bodytype = H.species.get_bodytype(H)
-
-	var/icon/under_icon
-	if(icon_override)
-		under_icon = icon_override
-	else if(human_bodytype && LAZYISIN(sprite_sheets, human_bodytype))
-		under_icon = sprite_sheets[human_bodytype]
-	else if(LAZYISIN(item_icons, WEAR_BODY))
-		under_icon = item_icons[WEAR_BODY]
-	else
-		under_icon = default_onmob_icons[WEAR_BODY]
-	if(!(("[worn_state]_d") in icon_states(under_icon)))
-		flags_jumpsuit &= ~UNIFORM_SLEEVE_ROLLABLE
-
-/obj/item/clothing/under/verb/rollsuit()
-	set name = "Roll Sleeves"
-	set category = "Object"
-	set src in usr
-	if(!isliving(usr))
-		return
-	if(usr.stat)
-		return
-
+/obj/item/clothing/under/proc/roll_suit_sleeves(show_message = TRUE, mob/user)
 	update_rollsuit_status()
 	if(flags_jumpsuit & UNIFORM_SLEEVE_ROLLABLE)
 		flags_jumpsuit ^= UNIFORM_SLEEVE_ROLLED
 		if(flags_jumpsuit & UNIFORM_JACKET_REMOVED)
-			to_chat(usr, SPAN_NOTICE("You roll the jacket's sleeves in your hands.")) //visual representation that the sleeves have been rolled while jacket has been removed.
+			if(show_message)
+				to_chat(user, SPAN_NOTICE("You roll the jacket's sleeves in your hands.")) //visual representation that the sleeves have been rolled while jacket has been removed.
 		else if(flags_jumpsuit & UNIFORM_SLEEVE_ROLLED)
 			LAZYSET(item_state_slots, WEAR_BODY, "[worn_state]_d")
 			update_clothing_icon()
 		else
 			LAZYSET(item_state_slots, WEAR_BODY, worn_state)
 			update_clothing_icon()
+	else if(show_message)
+		to_chat(user, SPAN_WARNING("You cannot roll your sleeves!"))
 
-	else
-		to_chat(usr, SPAN_WARNING("You cannot roll your sleeves!"))
-
-/obj/item/clothing/under/proc/update_removejacket_status()
-	var/human_bodytype
-	if(sprite_sheets && ishuman(loc))
-		var/mob/living/carbon/human/H = loc
-		human_bodytype = H.species.get_bodytype(H)
-
-	var/icon/under_icon
-	if(icon_override)
-		under_icon = icon_override
-	else if(human_bodytype && LAZYISIN(sprite_sheets, human_bodytype))
-		under_icon = sprite_sheets[human_bodytype]
-	else if(LAZYISIN(item_icons, WEAR_BODY))
-		under_icon = item_icons[WEAR_BODY]
-	else
-		under_icon = default_onmob_icons[WEAR_BODY]
-	if(!(("[worn_state]_dj") in icon_states(under_icon)))
-		flags_jumpsuit &= ~UNIFORM_JACKET_REMOVABLE
-
-/obj/item/clothing/under/verb/removejacket()
-	set name = "Toggle Jacket"
-	set category = "Object"
-	set src in usr
-	if(!isliving(usr))
-		return
-	if(usr.stat)
-		return
-
+/obj/item/clothing/under/proc/roll_suit_jacket(show_message = TRUE, mob/user)
 	update_removejacket_status()
 	if(flags_jumpsuit & UNIFORM_JACKET_REMOVABLE)
 		flags_jumpsuit ^= UNIFORM_JACKET_REMOVED
@@ -260,26 +216,146 @@
 		else
 			LAZYSET(item_state_slots, WEAR_BODY, worn_state)
 		update_clothing_icon()
+	else if(show_message)
+		to_chat(user, SPAN_WARNING("\The [src] doesn't have a removable jacket!"))
+
+
+/obj/item/clothing/under/proc/cut_suit_jacket(show_message = TRUE, mob/user, obj/item/item_using)
+	if(!(flags_jumpsuit & UNIFORM_SLEEVE_CUTTABLE))
+		if(show_message)
+			to_chat(user, SPAN_NOTICE("You can't cut up [src]."))
+			return
+	else if(flags_jumpsuit & UNIFORM_JACKET_REMOVED)
+		if(show_message)
+			to_chat(user, SPAN_NOTICE("You can't dice up [src] while the jacket is removed."))
+			return
+	else if(flags_jumpsuit & UNIFORM_SLEEVE_ROLLED)
+		if(show_message)
+			to_chat(user, SPAN_NOTICE("You can't dice up [src] while it's rolled."))
+			return
 	else
-		to_chat(usr, SPAN_WARNING("\The [src] doesn't have a removable jacket!"))
+		flags_jumpsuit &= ~(UNIFORM_SLEEVE_ROLLABLE|UNIFORM_SLEEVE_CUTTABLE)
+		flags_jumpsuit |= UNIFORM_SLEEVE_CUT
+		LAZYSET(item_state_slots, WEAR_BODY, "[worn_state]_df")
+		update_clothing_icon()
+		update_rollsuit_status()
+		update_removejacket_status()
+		if(show_message && item_using)
+			user.visible_message("[user] slices up \the [src]'s sleeves with \the [item_using].")
+
+/obj/item/clothing/under/proc/update_rollsuit_status()
+	var/human_bodytype
+	if(sprite_sheets && ishuman(loc))
+		var/mob/living/carbon/human/H = loc
+		human_bodytype = H.species.get_bodytype(H)
+
+	var/icon/under_icon
+	if(icon_override)
+		under_icon = icon_override
+	else if(human_bodytype && LAZYISIN(sprite_sheets, human_bodytype))
+		under_icon = sprite_sheets[human_bodytype]
+	else if(contained_sprite)
+		under_icon = icon
+	else if(LAZYISIN(item_icons, WEAR_BODY))
+		under_icon = item_icons[WEAR_BODY]
+	else
+		under_icon = default_onmob_icons[WEAR_BODY]
+
+	var/check_worn_state = "[worn_state]_d[contained_sprite ? "_un" : ""]"
+	if(!(check_worn_state in icon_states(under_icon)))
+		flags_jumpsuit &= ~UNIFORM_SLEEVE_ROLLABLE
+
+/obj/item/clothing/under/verb/rollsuit()
+	set name = "Roll Sleeves"
+	set category = "Object"
+	set src in usr
+	if(!isliving(usr))
+		return
+	if(usr.stat)
+		return
+
+	roll_suit_sleeves(TRUE, usr)
+
+/obj/item/clothing/under/proc/update_removejacket_status()
+	var/human_bodytype
+	if(sprite_sheets && ishuman(loc))
+		var/mob/living/carbon/human/H = loc
+		human_bodytype = H.species.get_bodytype(H)
+
+	var/icon/under_icon
+	if(icon_override)
+		under_icon = icon_override
+	else if(human_bodytype && LAZYISIN(sprite_sheets, human_bodytype))
+		under_icon = sprite_sheets[human_bodytype]
+	else if(contained_sprite)
+		under_icon = icon
+	else if(LAZYISIN(item_icons, WEAR_BODY))
+		under_icon = item_icons[WEAR_BODY]
+	else
+		under_icon = default_onmob_icons[WEAR_BODY]
+
+	var/check_worn_state = "[worn_state]_dj[contained_sprite ? "_un" : ""]"
+	if(!(check_worn_state in icon_states(under_icon)))
+		flags_jumpsuit &= ~UNIFORM_JACKET_REMOVABLE
+
+/obj/item/clothing/under/verb/removejacket()
+	set name = "Toggle Jacket"
+	set category = "Object"
+	set src in usr
+	if(!isliving(usr))
+		return
+	if(usr.stat)
+		return
+
+	roll_suit_jacket(TRUE, usr)
+
+/obj/item/clothing/under/verb/togglehood()
+	set name = "Toggle Hood"
+	set category = "Object"
+	set src in usr
+	if(!isliving(usr))
+		return
+	if(usr.stat)
+		return
+	toggle_uniform_hood(TRUE, usr)
+
+/obj/item/clothing/under/proc/toggle_uniform_hood(show_message = TRUE, mob/living/carbon/human/user)
+	if(!hood_state)
+		if(show_message)
+			to_chat(user, SPAN_WARNING("Your uniform doesn't have a hood!"))
+		return
+	update_rollsuit_status() //we need the _d version of the sprite anyways. In the future we might need to make a different version of the sprite to accomodate for rolling sleeves and hoods.
+	if(user.head && !istype(user.head, hood_state))
+		to_chat(user, SPAN_WARNING("You can't wear a hood while also wearing the [user.head]!"))
+		return
+
+	if(!HAS_TRAIT(src, TRAIT_CLOTHING_HOOD))
+		to_chat(user, SPAN_NOTICE("You pull your hood up."))
+		user.equip_to_slot_if_possible(new hood_state(user), WEAR_HEAD) //This is a 'phantom' hood. It disappears if the jumpsuit is unequipped/if it's toggled.
+		LAZYSET(item_state_slots, WEAR_BODY, "[worn_state]_d")
+		RegisterSignal(src, COMSIG_ITEM_UNEQUIPPED, PROC_REF(toggle_uniform_hood)) //These will unequip the phantom hood and toggle the state of the suit
+		RegisterSignal(user.head, COMSIG_ITEM_UNEQUIPPED, PROC_REF(toggle_uniform_hood)) // If either is unequipped.
+		update_clothing_icon()
+		if(!TIMER_COOLDOWN_CHECK(user, COOLDOWN_ITEM_HOOD_SOUND))
+			playsound(user.loc, pick('sound/handling/armorequip_1.ogg', 'sound/handling/armorequip_2.ogg'), 25, 1)
+			TIMER_COOLDOWN_START(user, COOLDOWN_ITEM_HOOD_SOUND, 1 SECONDS)
+		ADD_TRAIT(src, TRAIT_CLOTHING_HOOD, TRAIT_SOURCE_CLOTHING)
+		return
+
+	to_chat(user, SPAN_NOTICE("You pull your hood down."))
+	UnregisterSignal(src, COMSIG_ITEM_UNEQUIPPED) //See above, these deregister the signals so that it doesn't fire twice.
+	UnregisterSignal(user.head, COMSIG_ITEM_UNEQUIPPED)
+	qdel(user.head) //This will only delete the hood, see the typecheck above.
+	LAZYSET(item_state_slots, WEAR_BODY, worn_state)
+	update_clothing_icon()
+	if(!TIMER_COOLDOWN_CHECK(user, COOLDOWN_ITEM_HOOD_SOUND))
+		playsound(user.loc, pick('sound/handling/armorequip_1.ogg', 'sound/handling/armorequip_2.ogg'), 25, 1)
+		TIMER_COOLDOWN_START(user, COOLDOWN_ITEM_HOOD_SOUND, 1 SECONDS)
+	REMOVE_TRAIT(src, TRAIT_CLOTHING_HOOD, TRAIT_SOURCE_CLOTHING)
 
 /obj/item/clothing/under/attackby(obj/item/B, mob/user)
 	if(istype(B, /obj/item/attachable/bayonet) && (user.a_intent == INTENT_HARM))
-		if(!(flags_jumpsuit & UNIFORM_SLEEVE_CUTTABLE))
-			to_chat(user, SPAN_NOTICE("You can't cut up [src]."))
-		else if(flags_jumpsuit & UNIFORM_JACKET_REMOVED)
-			to_chat(user, SPAN_NOTICE("You can't dice up [src] while the jacket is removed."))
-		else if(flags_jumpsuit & UNIFORM_SLEEVE_ROLLED)
-			to_chat(user, SPAN_NOTICE("You can't dice up [src] while it's rolled."))
-		else
-			flags_jumpsuit &= ~(UNIFORM_SLEEVE_ROLLABLE|UNIFORM_SLEEVE_CUTTABLE)
-			flags_jumpsuit |= UNIFORM_SLEEVE_CUT
-
-			LAZYSET(item_state_slots, WEAR_BODY, "[worn_state]_df")
-			user.visible_message("[user] slices [src] with [B].")
-			update_clothing_icon()
-			update_rollsuit_status()
-			update_removejacket_status()
+		cut_suit_jacket(TRUE, user, B)
 
 	else if(loc == user && istype(B, /obj/item/clothing/under) && src != B && ishuman(user))
 		var/mob/living/carbon/human/H = user

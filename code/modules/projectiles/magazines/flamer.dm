@@ -5,6 +5,7 @@
 /obj/item/ammo_magazine/flamer_tank
 	name = "incinerator tank"
 	desc = "A fuel tank used to store fuel for use in the M240 incinerator unit. Handle with care."
+	icon = 'icons/obj/items/weapons/guns/ammo_by_faction/uscm.dmi'
 	icon_state = "flametank_custom"
 	item_state = "flametank"
 	max_rounds = 100
@@ -52,11 +53,12 @@
 	if(usr.get_active_hand() != src)
 		return
 
-	if(alert(usr, "Do you really want to empty out [src]?", "Empty canister", "Yes", "No") == "No")
+	if(alert(usr, "Do you really want to empty out [src]?", "Empty canister", "Yes", "No") != "Yes")
 		return
 
 	reagents.clear_reagents()
 
+	playsound(loc, 'sound/effects/refill.ogg', 25, 1, 3)
 	to_chat(usr, SPAN_NOTICE("You empty out [src]"))
 	update_icon()
 
@@ -70,22 +72,21 @@
 			G.update_icon()
 
 /obj/item/ammo_magazine/flamer_tank/afterattack(obj/target, mob/user , flag) //refuel at fueltanks when we run out of ammo.
-	if(!istype(target, /obj/structure/reagent_dispensers/fueltank) && !istype(target, /obj/item/tool/weldpack) && !istype(target, /obj/item/storage/backpack/marine/engineerpack))
-		return ..()
 	if(get_dist(user,target) > 1)
 		return ..()
+	if(!istype(target, /obj/structure/reagent_dispensers/fueltank) && !istype(target, /obj/item/tool/weldpack) && !istype(target, /obj/item/storage/backpack/marine/engineerpack))
+		return ..()
 
-	var/obj/O = target
-	if(!O.reagents || O.reagents.reagent_list.len < 1)
-		to_chat(user, SPAN_WARNING("[O] is empty!"))
+	if(!target.reagents || target.reagents.reagent_list.len < 1)
+		to_chat(user, SPAN_WARNING("[target] is empty!"))
 		return
 
 	if(!reagents)
 		create_reagents(max_rounds)
 
-	var/datum/reagent/to_add = O.reagents.reagent_list[1]
+	var/datum/reagent/to_add = target.reagents.reagent_list[1]
 
-	if(!istype(to_add) || (length(reagents.reagent_list) && flamer_chem != to_add.id) || length(O.reagents.reagent_list) > 1)
+	if(!istype(to_add) || (length(reagents.reagent_list) && flamer_chem != to_add.id) || length(target.reagents.reagent_list) > 1)
 		to_chat(user, SPAN_WARNING("You can't mix fuel mixtures!"))
 		return
 
@@ -95,10 +96,11 @@
 
 	var/fuel_amt_to_remove = Clamp(to_add.volume, 0, max_rounds - reagents.get_reagent_amount(to_add.id))
 	if(!fuel_amt_to_remove)
-		to_chat(user, SPAN_WARNING("[O] is empty!"))
+		if(!max_rounds)
+			to_chat(user, SPAN_WARNING("[target] is empty!"))
 		return
 
-	O.reagents.remove_reagent(to_add.id, fuel_amt_to_remove)
+	target.reagents.remove_reagent(to_add.id, fuel_amt_to_remove)
 	reagents.add_reagent(to_add.id, fuel_amt_to_remove)
 	playsound(loc, 'sound/effects/refill.ogg', 25, 1, 3)
 	caliber = to_add.name
@@ -123,19 +125,19 @@
 
 	return 100 * (reagents.total_volume / max_rounds)
 
-/obj/item/ammo_magazine/flamer_tank/examine(mob/user)
-	..()
-	to_chat(user, SPAN_NOTICE("It contains:"))
+/obj/item/ammo_magazine/flamer_tank/get_examine_text(mob/user)
+	. = ..()
+	. += SPAN_NOTICE("It contains:")
 	if(reagents && reagents.reagent_list.len)
 		for(var/datum/reagent/R in reagents.reagent_list)
-			to_chat(user, SPAN_NOTICE(" [R.volume] units of [R.name]."))
+			. += SPAN_NOTICE(" [R.volume] units of [R.name].")
 	else
-		to_chat(user, SPAN_NOTICE("Nothing."))
+		. += SPAN_NOTICE("Nothing.")
 
 // This is gellie fuel. Green Flames.
 /obj/item/ammo_magazine/flamer_tank/gellied
 	name = "incinerator tank (B-Gel)"
-	desc = "A fuel tank full of specialized Ultra Thick Napthal Fuel type B-Gel. Unlike its liquid contemporaries, this gellied variant of napalm is easily extinguished, but shoots far and lingers on the ground in a viscous mess, while reacting with inorganic materials to break them down. Handle with exceptional care."
+	desc = "A fuel tank full of specialized Ultra Thick Napthal Fuel type B-Gel. Unlike its liquid contemporaries, this gelled variant of napalm is easily extinguished, but shoots far and lingers on the ground in a viscous mess, while reacting with inorganic materials to break them down. Handle with exceptional care."
 	caliber = "Napalm Gel"
 	flamer_chem = "napalmgel"
 	max_rounds = 200
@@ -145,7 +147,7 @@
 
 /obj/item/ammo_magazine/flamer_tank/EX
 	name = "incinerator tank (EX)"
-	desc = "A fuel tank of Ultra Thick Napthal Fuel type EX, a sticky combustable liquid chemical that burns so hot it melts straight through flame-resistant material, for use in the M240-T incinerator unit. Handle with care."
+	desc = "A fuel tank of Ultra Thick Napthal Fuel type EX, a sticky combustible liquid chemical that burns so hot it melts straight through flame-resistant material, for use in the M240-T incinerator unit. Handle with care."
 	caliber = "Napalm EX"
 	flamer_chem = "napalmex"
 
@@ -176,9 +178,9 @@
 		to_chat(usr, SPAN_NOTICE("You set the pressure regulator to [set_pressure] U/t"))
 		fuel_pressure = set_pressure
 
-/obj/item/ammo_magazine/flamer_tank/custom/examine(mob/user)
-	..()
-	to_chat(user, SPAN_NOTICE("The pressure regulator is set to: [src.fuel_pressure] U/t"))
+/obj/item/ammo_magazine/flamer_tank/custom/get_examine_text(mob/user)
+	. = ..()
+	. += SPAN_NOTICE("The pressure regulator is set to: [src.fuel_pressure] U/t")
 
 // Pyro regular flamer tank just bigger than the base flamer tank.
 /obj/item/ammo_magazine/flamer_tank/large
@@ -210,7 +212,7 @@
 // This is the blue flamer fuel for the pyro.
 /obj/item/ammo_magazine/flamer_tank/large/X
 	name = "large incinerator tank (X)"
-	desc = "A large fuel tank of Ultra Thick Napthal Fuel type X, a sticky combustable liquid chemical that burns extremely hot, for use in the M240-T incinerator unit. Handle with care."
+	desc = "A large fuel tank of Ultra Thick Napthal Fuel type X, a sticky combustible liquid chemical that burns extremely hot, for use in the M240-T incinerator unit. Handle with care."
 	caliber = "Napalm X"
 	flamer_chem = "napalmx"
 
@@ -218,7 +220,7 @@
 
 /obj/item/ammo_magazine/flamer_tank/large/EX
 	name = "large incinerator tank (EX)"
-	desc = "A large fuel tank of Ultra Thick Napthal Fuel type EX, a sticky combustable liquid chemical that burns so hot it melts straight through flame-resistant material, for use in the M240-T incinerator unit. Handle with care."
+	desc = "A large fuel tank of Ultra Thick Napthal Fuel type EX, a sticky combustible liquid chemical that burns so hot it melts straight through flame-resistant material, for use in the M240-T incinerator unit. Handle with care."
 	caliber = "Napalm EX"
 	flamer_chem = "napalmex"
 

@@ -36,7 +36,7 @@ In practice this means that:
 
 There are several things that need to be remembered:
 
->	Whenever we do something that should cause an overlay to update (which doesn't use standard procs
+> Whenever we do something that should cause an overlay to update (which doesn't use standard procs
 	( i.e. you do something like l_hand = /obj/item/something new(src) )
 	You will need to call the relevant update_inv_* proc:
 		update_inv_head()
@@ -61,26 +61,26 @@ There are several things that need to be remembered:
 	corgi etc. Instead, it'll just return without doing any work. So no harm in calling it for corgis and such.
 
 
->	There are also these special cases:
-		UpdateDamageIcon()	//handles damage overlays for brute/burn damage //(will rename this when I geta round to it)
-		update_body()	//Handles updating your mob's icon to reflect their gender/race/complexion etc
-		update_hair()	//Handles updating your hair overlay (used to be update_face, but mouth and
+> There are also these special cases:
+		UpdateDamageIcon() //handles damage overlays for brute/burn damage //(will rename this when I geta round to it)
+		update_body() //Handles updating your mob's icon to reflect their gender/race/complexion etc
+		update_hair() //Handles updating your hair overlay (used to be update_face, but mouth and
 																			...eyes were merged into update_body)
 		update_targeted() // Updates the target overlay when someone points a gun at you
 
->	If you need to update all overlays you can use regenerate_icons(). it works exactly like update_clothing used to.
+> If you need to update all overlays you can use regenerate_icons(). it works exactly like update_clothing used to.
 
 
 */
 
-
-
 /mob/living/carbon/human/apply_overlay(cache_index)
-	var/image/I = overlays_standing[cache_index]
-	if(I)
-		I.appearance_flags |= RESET_COLOR
-		SEND_SIGNAL(src, COMSIG_HUMAN_OVERLAY_APPLIED, cache_index, I)
-		overlays += I
+	var/image/images = overlays_standing[cache_index]
+
+	if(!images)
+		return
+
+	SEND_SIGNAL(src, COMSIG_HUMAN_OVERLAY_APPLIED, cache_index, images)
+	overlays += images
 
 /mob/living/carbon/human/remove_overlay(cache_index)
 	if(overlays_standing[cache_index])
@@ -90,27 +90,23 @@ There are several things that need to be remembered:
 		overlays_standing[cache_index] = null
 
 
-/mob/living/carbon/human/update_transform(var/force = FALSE)
+/mob/living/carbon/human/update_transform(force = FALSE)
 	if(lying == lying_prev && !force)
 		return
 	lying_prev = lying
-	var/matrix/M = matrix()
-	var/matrix/L = matrix() //Counter-rotation for langchat text.
+	var/matrix/new_matrix = matrix()
 	if(lying)
 		if(pulledby && pulledby.grab_level >= GRAB_CARRY)
-			M.Turn(90)
-			L.Turn(270)
+			new_matrix.Turn(90)
 		else
 			if(prob(50))
-				M.Turn(90)
-				L.Turn(270)
+				new_matrix.Turn(90)
 			else
-				M.Turn(270)
-				L.Turn(90)
-			M.Translate(rand(-10,10),rand(-10,10))
-		apply_transform(M)
+				new_matrix.Turn(270)
+			new_matrix.Translate(rand(-10,10), rand(-10,10))
+		apply_transform(new_matrix)
 	else
-		apply_transform(M)
+		apply_transform(new_matrix)
 
 /mob/living/carbon/human/UpdateDamageIcon()
 	for(var/obj/limb/O in limbs)
@@ -136,10 +132,32 @@ There are several things that need to be remembered:
 //BASE MOB SPRITE
 /mob/living/carbon/human/proc/update_body()
 	appearance_flags |= KEEP_TOGETHER // sanity
-	vis_contents.Cut()
-	for(var/obj/limb/part in limbs)
-		vis_contents += part
-		part.update_icon(TRUE)
+
+	update_damage_overlays()
+
+	var/list/needs_update = list()
+	for(var/obj/limb/part as anything in limbs)
+		part.update_limb()
+
+		var/old_key = icon_render_keys?[part.icon_name]
+		icon_render_keys[part.icon_name] = part.get_limb_icon_key()
+		if(icon_render_keys[part.icon_name] == old_key)
+			continue
+
+		needs_update += part
+
+	var/list/new_limbs = list()
+	for(var/obj/limb/part as anything in limbs)
+		if(part in needs_update)
+			var/bodypart_icon = part.get_limb_icon()
+			new_limbs += bodypart_icon
+			icon_render_image_cache[icon_render_keys[part.icon_name]] = bodypart_icon
+		else
+			new_limbs += icon_render_image_cache[icon_render_keys[part.icon_name]]
+
+	remove_overlay(BODYPARTS_LAYER)
+	overlays_standing[BODYPARTS_LAYER] = new_limbs
+	apply_overlay(BODYPARTS_LAYER)
 
 	if(species.flags & HAS_UNDERWEAR)
 		//Underwear
@@ -158,12 +176,28 @@ There are several things that need to be remembered:
 		overlays_standing[UNDERSHIRT_LAYER] = undershirt_icon
 		apply_overlay(UNDERSHIRT_LAYER)
 
+/// Recalculates and reapplies damage overlays to every limb
+/mob/living/carbon/human/proc/update_damage_overlays()
+	remove_overlay(DAMAGE_LAYER)
+
+	var/list/damage_overlays = list()
+	for(var/obj/limb/part as anything in limbs)
+		if(part.status & LIMB_DESTROYED)
+			continue
+
+		damage_overlays += part.get_damage_overlays()
+
+	overlays_standing[DAMAGE_LAYER] = damage_overlays
+
+	apply_overlay(DAMAGE_LAYER)
+
 /mob/living/carbon/human/proc/remove_underwear() // :flushed: - geeves
 	remove_overlay(UNDERSHIRT_LAYER)
 	remove_overlay(UNDERWEAR_LAYER)
 
 //HAIR OVERLAY
 /mob/living/carbon/human/proc/update_hair()
+	remove_overlay(HAIR_GRADIENT_LAYER)
 	remove_overlay(HAIR_LAYER)
 	remove_overlay(FACIAL_LAYER)
 
@@ -191,30 +225,38 @@ There are several things that need to be remembered:
 			hair_s.layer = -HAIR_LAYER
 			if(hair_style.do_colouration)
 				hair_s.color = list(null, null, null, null, rgb(r_hair, g_hair, b_hair))
+
+			if(grad_style)
+				var/datum/sprite_accessory/hair_gradient_style = GLOB.hair_gradient_list[grad_style]
+				if(hair_gradient_style?.icon_state && (species.name in hair_gradient_style.species_allowed))
+					var/image/gradient_overlay = new/image("icon" = hair_style.icon, "icon_state" = "[hair_style.icon_state]_s")
+					var/icon/temp = icon(hair_gradient_style.icon, hair_gradient_style.icon_state)
+					var/icon/temp_hair = icon(hair_style.icon, "[hair_style.icon_state]_s")
+					temp_hair.Blend(temp, ICON_SUBTRACT)
+					gradient_overlay.icon = temp_hair
+					gradient_overlay.layer = -HAIR_GRADIENT_LAYER
+					gradient_overlay.color = list(null, null, null, null, rgb(r_gradient, g_gradient, b_gradient))
+					overlays_standing[HAIR_GRADIENT_LAYER] = gradient_overlay
+					apply_overlay(HAIR_GRADIENT_LAYER)
+
 			overlays_standing[HAIR_LAYER] = hair_s
 			apply_overlay(HAIR_LAYER)
-
 
 //Call when target overlay should be added/removed
 /mob/living/carbon/human/update_targeted()
 	remove_overlay(TARGETED_LAYER)
-	var/image/I
-	if(targeted_by && target_locked)
-		I = image("icon" = target_locked)
-	else if(!targeted_by && target_locked)
-		QDEL_NULL(target_locked)
+
+	var/image/holo_card_image
+
 	if(holo_card_color)
-		if(I)
-			I.overlays += image("icon" = 'icons/effects/Targeted.dmi', "icon_state" = "holo_card_[holo_card_color]")
-		else
-			I = image("icon" = 'icons/effects/Targeted.dmi', "icon_state" = "holo_card_[holo_card_color]")
-	if(!I)
+		holo_card_image = image("icon" = 'icons/effects/Targeted.dmi', "icon_state" = "holo_card_[holo_card_color]")
+
+	if(!holo_card_image)
 		return
-	I.layer = -TARGETED_LAYER
-	overlays_standing[TARGETED_LAYER] = I
+
+	holo_card_image.layer = -TARGETED_LAYER
+	overlays_standing[TARGETED_LAYER] = holo_card_image
 	apply_overlay(TARGETED_LAYER)
-
-
 
 //Call when someone is gauzed or splinted, or when one of those items are removed
 /mob/living/carbon/human/update_med_icon()
@@ -339,7 +381,7 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 	if(!wear_id.pinned_on_uniform || (w_uniform && w_uniform.displays_id && !(w_uniform.flags_jumpsuit & UNIFORM_JACKET_REMOVED)))
 		var/image/id_overlay = wear_id.get_mob_overlay(src, WEAR_ID)
 		id_overlay.layer = -ID_LAYER
-		overlays_standing[ID_LAYER]	= id_overlay
+		overlays_standing[ID_LAYER] = id_overlay
 		apply_overlay(ID_LAYER)
 
 /mob/living/carbon/human/update_inv_gloves()
@@ -359,9 +401,8 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 	if(!I)
 		return
 	I.layer = -GLOVES_LAYER
-	overlays_standing[GLOVES_LAYER]	= I
+	overlays_standing[GLOVES_LAYER] = I
 	apply_overlay(GLOVES_LAYER)
-
 
 /mob/living/carbon/human/update_inv_glasses()
 	remove_overlay(GLASSES_LAYER)
@@ -425,7 +466,7 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 			client.screen += s_store
 			s_store.screen_loc = hud_used.ui_datum.hud_slot_offset(s_store, hud_used.ui_datum.ui_sstore1)
 
-		var/image/I	= s_store.get_mob_overlay(src, WEAR_J_STORE)
+		var/image/I = s_store.get_mob_overlay(src, WEAR_J_STORE)
 		I.layer = -SUIT_STORE_LAYER
 		overlays_standing[SUIT_STORE_LAYER] = I
 		apply_overlay(SUIT_STORE_LAYER)
@@ -453,12 +494,15 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 		if(istype(head, /obj/item/clothing/head/helmet/marine))
 			var/obj/item/clothing/head/helmet/marine/marine_helmet = head
 			if(assigned_squad && marine_helmet.flags_marine_helmet & HELMET_SQUAD_OVERLAY)
-				var/datum/squad/S = assigned_squad
-				var/leader = S.squad_leader == src
-				if(S.color <= helmetmarkings.len)
-					var/image/J = leader? helmetmarkings_sql[S.color] : helmetmarkings[S.color]
-					J.layer = -HEAD_SQUAD_LAYER
-					overlays_standing[HEAD_SQUAD_LAYER] = J
+				if(assigned_squad && assigned_squad.equipment_color)
+					var/leader = assigned_squad.squad_leader
+					var/image/helmet_overlay = image(marine_helmet.helmet_overlay_icon, icon_state = "std-helmet")
+					if(leader == src)
+						helmet_overlay = image(marine_helmet.helmet_overlay_icon, icon_state = "sql-helmet")
+					helmet_overlay.layer = -HEAD_SQUAD_LAYER
+					helmet_overlay.alpha = assigned_squad.armor_alpha
+					helmet_overlay.color = assigned_squad.equipment_color
+					overlays_standing[HEAD_SQUAD_LAYER] = helmet_overlay
 					apply_overlay(HEAD_SQUAD_LAYER)
 
 			var/num_helmet_overlays = 0
@@ -512,14 +556,16 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 		if(istype(wear_suit, /obj/item/clothing/suit/storage/marine))
 			var/obj/item/clothing/suit/storage/marine/marine_armor = wear_suit
 			if(marine_armor.flags_marine_armor & ARMOR_SQUAD_OVERLAY)
-				if(assigned_squad)
-					var/datum/squad/S = assigned_squad
-					var/leader = S.squad_leader == src
-					if(S.color <= helmetmarkings.len)
-						var/image/J = leader? armormarkings_sql[S.color] : armormarkings[S.color]
-						J.layer = -SUIT_SQUAD_LAYER
-						overlays_standing[SUIT_SQUAD_LAYER] = J
-						apply_overlay(SUIT_SQUAD_LAYER)
+				if(assigned_squad && assigned_squad.equipment_color)
+					var/leader = assigned_squad.squad_leader
+					var/image/squad_overlay = image(marine_armor.squad_overlay_icon, icon_state = "std-armor")
+					if(leader == src)
+						squad_overlay = image(marine_armor.squad_overlay_icon, icon_state = "sql-armor")
+					squad_overlay.layer = -SUIT_SQUAD_LAYER
+					squad_overlay.alpha = assigned_squad.armor_alpha
+					squad_overlay.color = assigned_squad.equipment_color
+					overlays_standing[SUIT_SQUAD_LAYER] = squad_overlay
+					apply_overlay(SUIT_SQUAD_LAYER)
 
 			if(marine_armor.armor_overlays.len)
 				var/image/K
@@ -663,7 +709,7 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 
 
 //Adds a collar overlay above the helmet layer if the suit has one
-//	Suit needs an identically named sprite in icons/mob/collar.dmi
+// Suit needs an identically named sprite in icons/mob/collar.dmi
 /mob/living/carbon/human/proc/update_collar()
 	remove_overlay(COLLAR_LAYER)
 	if(!istype(wear_suit,/obj/item/clothing/suit))
@@ -672,7 +718,7 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 	var/image/I = S.get_collar()
 	if(I)
 		I.layer = -COLLAR_LAYER
-		overlays_standing[COLLAR_LAYER]	= I
+		overlays_standing[COLLAR_LAYER] = I
 		apply_overlay(COLLAR_LAYER)
 
 /mob/living/carbon/human/update_burst()
@@ -680,9 +726,9 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 	var/image/standing
 	switch(chestburst)
 		if(1)
-			standing = image("icon" = 'icons/mob/hostiles/Effects.dmi',"icon_state" = "burst_stand", "layer" = -BURST_LAYER)
+			standing = image("icon" = 'icons/mob/xenos/effects.dmi',"icon_state" = "burst_stand", "layer" = -BURST_LAYER)
 		if(2)
-			standing = image("icon" = 'icons/mob/hostiles/Effects.dmi',"icon_state" = "bursted_stand", "layer" = -BURST_LAYER)
+			standing = image("icon" = 'icons/mob/xenos/effects.dmi',"icon_state" = "bursted_stand", "layer" = -BURST_LAYER)
 		else
 			return
 	overlays_standing[BURST_LAYER] = standing
@@ -692,17 +738,22 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 /mob/living/carbon/human/update_fire()
 	remove_overlay(FIRE_LAYER)
 	if(!on_fire)
+		set_light_on(FALSE)
 		return
 	var/image/I
 	switch(fire_stacks)
 		if(1 to 14)
 			I = image("icon"='icons/mob/humans/onmob/OnFire.dmi', "icon_state"="Standing_weak", "layer"= -FIRE_LAYER)
+			set_light_range(2)
 		if(15 to INFINITY)
 			I = image("icon"='icons/mob/humans/onmob/OnFire.dmi', "icon_state"="Standing_medium", "layer"= -FIRE_LAYER)
+			set_light_range(3)
 		else
 			return
 	I.appearance_flags |= RESET_COLOR|RESET_ALPHA
 	I.color = fire_reagent.burncolor
+	set_light_color(fire_reagent.burncolor)
+	set_light_on(TRUE)
 	overlays_standing[FIRE_LAYER] = I
 	apply_overlay(FIRE_LAYER)
 
@@ -725,7 +776,6 @@ Applied by gun suicide and high impact bullet executions, removed by rejuvenate,
 
 //Human Overlays Indexes/////////
 #undef MUTANTRACE_LAYER
-#undef DAMAGE_LAYER
 #undef UNIFORM_LAYER
 #undef TAIL_LAYER
 #undef ID_LAYER

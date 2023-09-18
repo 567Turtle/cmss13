@@ -17,6 +17,7 @@
 	stage_prob = 4
 	stage_minimum_age = 150
 	survive_mob_death = TRUE //FALSE //switch to true to make dead infected humans still transform
+	longevity = 500 //should allow the dead to rise
 	var/zombie_transforming = 0 //whether we're currently transforming the host into a zombie.
 	var/goo_message_cooldown = 0 //to make sure we don't spam messages too often.
 	var/stage_counter = 0 // tells a dead infectee their stage, so they can know when-abouts they'll revive
@@ -81,7 +82,7 @@
 		if(5)
 			if(H.stat == DEAD && stage_counter != stage)
 				stage_counter = stage
-				if(H.species.name != "Zombie" && !zombie_transforming)
+				if(H.species.name != SPECIES_ZOMBIE && !zombie_transforming)
 					to_chat(H, SPAN_CENTERBOLD("Your zombie infection is now at Stage Five! Your transformation should have happened already, but will be forced now."))
 					zombie_transform(H)
 			if(!zombie_transforming && prob(50))
@@ -95,58 +96,61 @@
 				H.nutrition = NUTRITION_MAX //never hungry
 
 
-/datum/disease/black_goo/proc/zombie_transform(mob/living/carbon/human/H)
+/datum/disease/black_goo/proc/zombie_transform(mob/living/carbon/human/human)
 	set waitfor = 0
 	zombie_transforming = TRUE
-	H.vomit_on_floor()
-	H.AdjustStunned(5)
+	human.vomit_on_floor()
+	human.adjust_effect(5, STUN)
 	sleep(20)
-	H.make_jittery(500)
+	human.make_jittery(500)
 	sleep(30)
-	if(H && H.loc)
-		if(H.stat == DEAD)
-			H.revive(TRUE)
-		playsound(H.loc, 'sound/hallucinations/wail.ogg', 25, 1)
-		H.jitteriness = 0
-		H.set_species("Zombie")
+	if(human && human.loc)
+		if(human.stat == DEAD)
+			human.revive(TRUE)
+			human.remove_language(LANGUAGE_ENGLISH) // You lose the ability to understand english. Language processing is handled in the mind not the body.
+			var/datum/species/zombie/zombie_species = GLOB.all_species[SPECIES_ZOMBIE]
+			zombie_species.handle_alert_ghost(human)
+		playsound(human.loc, 'sound/hallucinations/wail.ogg', 25, 1)
+		human.jitteriness = 0
+		human.set_species(SPECIES_ZOMBIE)
 		stage = 5
-		H.faction = FACTION_ZOMBIE
+		human.faction = FACTION_ZOMBIE
 		zombie_transforming = FALSE
 
 
 /obj/item/weapon/zombie_claws
+	gender = PLURAL
 	name = "claws"
 	icon = 'icons/mob/humans/species/r_zombie.dmi'
 	icon_state = "claw_l"
 	flags_item = NODROP|DELONDROP|ITEM_ABSTRACT
-	force = 40
+	force = MELEE_FORCE_TIER_6 //slightly higher than normal
 	w_class = SIZE_MASSIVE
 	sharp = 1
-	attack_verb = list("slashed", "bitten", "torn", "scraped", "nibbled")
+	attack_verb = list("slashed", "torn", "scraped", "gashed", "ripped")
 	pry_capable = IS_PRY_CAPABLE_FORCE
 
-/obj/item/weapon/zombie_claws/attack(mob/living/M, mob/living/carbon/human/user)
-	if(iszombie(M))
+/obj/item/weapon/zombie_claws/attack(mob/living/target, mob/living/carbon/human/user)
+	if(iszombie(target))
 		return FALSE
 
 	. = ..()
-	if(.)
-		playsound(loc, 'sound/weapons/bladeslice.ogg', 25, 1, 5)
+	if(!.)
+		return FALSE
+	playsound(loc, 'sound/weapons/bladeslice.ogg', 25, 1, 5)
 
-	if(isHumanStrict(M))
-		var/mob/living/carbon/human/H = M
+	if(ishuman_strict(target))
+		var/mob/living/carbon/human/human = target
 
-		for(var/datum/disease/black_goo/BG in H.viruses)
-			user.show_message(text(SPAN_XENOWARNING(" <B>You sense your target is infected</B>")))
-			return .
+		if(locate(/datum/disease/black_goo) in human.viruses)
+			to_chat(user, SPAN_XENOWARNING("<b>You sense your target is infected.</b>"))
+		else
+			var/bio_protected = max(CLOTHING_ARMOR_HARDCORE - human.getarmor(user.zone_selected, ARMOR_BIO), 0)
+			if(prob(bio_protected))
+				target.AddDisease(new /datum/disease/black_goo)
+				to_chat(user, SPAN_XENOWARNING("<b>You sense your target is now infected.</b>"))
 
-		var/bio_protected = max(CLOTHING_ARMOR_HARDCORE - H.getarmor(user.zone_selected, ARMOR_BIO), 0)
-
-		if(prob(bio_protected))
-			M.AddDisease(new /datum/disease/black_goo())
-			user.show_message(text(SPAN_XENOWARNING(" <B>You sense your target is now infected</B>")))
-
-	M.SetSuperslowed(max(2, M.superslowed)) // Make them slower
+	target.apply_effect(2, SLOW)
 
 /obj/item/weapon/zombie_claws/afterattack(obj/O as obj, mob/user as mob, proximity)
 	if(get_dist(src, O) > 1)
@@ -193,8 +197,8 @@
 	garbage = FALSE
 
 /obj/item/reagent_container/food/drinks/bottle/black_goo/Initialize()
-		..()
-		reagents.add_reagent("blackgoo", 30)
+	. = ..()
+	reagents.add_reagent("blackgoo", 30)
 
 
 /obj/item/reagent_container/food/drinks/bottle/black_goo_cure
@@ -209,20 +213,22 @@
 
 /datum/language/zombie
 	name = "Zombie"
-	desc = "If you select this from the language screen, expect a ban."
-	colour = "zombie"
-
-	speech_verb = "groans"
-	ask_verb = "groans"
-	exclaim_verb = "groans"
-
-	key = "4"
+	desc = "A growling, guttural method of communication, only Zombies seem to be capable of producing these sounds."
+	speech_verb = "growls"
+	ask_verb = "grumbles"
+	exclaim_verb = "snarls"
+	color = "monkey"
+	key = "h"
 	flags = RESTRICTED
 
+/datum/language/zombie/scramble(input)
+	return pick("Urrghh...", "Rrraaahhh...", "Aaaarghhh...", "Mmmrrrgggghhh...", "Huuuuhhhh...", "Sssssgrrrr...")
 
 /obj/item/clothing/glasses/zombie_eyes
 	name = "zombie eyes"
-	icon = null
+	gender = PLURAL
+	icon_state = "stub"
+	item_state = "BLANK"
 	w_class = SIZE_SMALL
 	vision_flags = SEE_MOBS
 	darkness_view = 7
@@ -239,15 +245,15 @@
 	storage_slots = 3
 	can_hold = list(/obj/item/reagent_container/food/drinks/bottle/black_goo)
 
-
-	examine(mob/user)
-		to_chat(user, "A strange looking metal container...")
-		if(contents.len <= 0)
-			to_chat(user, "There are no bottles left inside it.")
-		else if(contents.len == 1)
-			to_chat(user, "There is one bottle left inside it.")
-		else
-			to_chat(user, "There are [src.contents.len] bottles inside the container.")
+/obj/item/storage/fancy/blackgoo/get_examine_text(mob/user)
+	. = ..()
+	. += "A strange looking metal container..."
+	if(contents.len <= 0)
+		. += "There are no bottles left inside it."
+	else if(contents.len == 1)
+		. += "There is one bottle left inside it."
+	else
+		. += "There are [src.contents.len] bottles inside the container."
 
 
 /obj/item/storage/fancy/blackgoo/Initialize()
