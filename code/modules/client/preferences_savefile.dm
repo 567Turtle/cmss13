@@ -1,5 +1,5 @@
 #define SAVEFILE_VERSION_MIN 8
-#define SAVEFILE_VERSION_MAX 20
+#define SAVEFILE_VERSION_MAX 24
 
 //handles converting savefiles to new formats
 //MAKE SURE YOU KEEP THIS UP TO DATE!
@@ -11,8 +11,8 @@
 //if a file was updated, return 1
 /datum/preferences/proc/savefile_update(savefile/S)
 	if(!isnum(savefile_version) || savefile_version < SAVEFILE_VERSION_MIN) //lazily delete everything + additional files so they can be saved in the new format
-		for(var/ckey in preferences_datums)
-			var/datum/preferences/D = preferences_datums[ckey]
+		for(var/ckey in GLOB.preferences_datums)
+			var/datum/preferences/D = GLOB.preferences_datums[ckey]
 			if(D == src)
 				var/delpath = "data/player_saves/[copytext(ckey,1,2)]/[ckey]/"
 				if(delpath && fexists(delpath))
@@ -57,9 +57,8 @@
 	if(savefile_version < 17) //remove omniglots
 		var/list/language_traits = list()
 		S["traits"] >> language_traits
-		if(language_traits)
-			if(language_traits.len > 1)
-				language_traits = null
+		if(LAZYLEN(language_traits) > 1)
+			language_traits = null
 		S["traits"] << language_traits
 
 	if(savefile_version < 18) // adds ambient occlusion by default
@@ -80,6 +79,74 @@
 		sound_toggles |= (SOUND_ADMIN_MEME|SOUND_ADMIN_ATMOSPHERIC)
 		S["toggles_sound"] << sound_toggles
 
+	if(savefile_version < 21)
+		var/pref_toggles
+		S["toggle_prefs"] >> pref_toggles
+		if(pref_toggles & TOGGLE_ALTERNATING_DUAL_WIELD)
+			dual_wield_pref = DUAL_WIELD_SWAP
+		else
+			dual_wield_pref = DUAL_WIELD_FIRE
+		S["dual_wield_pref"] << dual_wield_pref
+
+	if(savefile_version < 22)
+		var/sound_toggles
+		S["toggles_sound"] >> sound_toggles
+		sound_toggles |= SOUND_OBSERVER_ANNOUNCEMENTS
+		S["toggles_sound"] << sound_toggles
+
+	if(savefile_version < 23)
+		var/ethnicity
+		var/skin_color = "pale2"
+		S["ethnicity"] >> ethnicity
+		switch(ethnicity)
+			if("anglo")
+				skin_color = "pale2"
+			if("western")
+				skin_color = "tan2"
+			if("germanic")
+				skin_color = "pale2"
+			if("scandinavian")
+				skin_color = "pale3"
+			if("baltic")
+				skin_color = "pale3"
+			if("sinoorient")
+				skin_color = "pale1"
+			if("southorient")
+				skin_color = "tan1"
+			if("indian")
+				skin_color = "tan3"
+			if("sino")
+				skin_color = "tan1"
+			if("mesoamerican")
+				skin_color = "tan3"
+			if("northamerican")
+				skin_color = "tan3"
+			if("southamerican")
+				skin_color = "tan2"
+			if("circumpolar")
+				skin_color = "tan1"
+			if("northafrican")
+				skin_color = "tan3"
+			if("centralafrican")
+				skin_color = "dark1"
+			if("costalafrican")
+				skin_color = "dark3"
+			if("persian")
+				skin_color = "tan3"
+			if("levant")
+				skin_color = "tan3"
+			if("australasian")
+				skin_color = "dark2"
+			if("polynesian")
+				skin_color = "tan3"
+		S["skin_color"] << skin_color
+
+	if(savefile_version < 24) // adds fax machine sounds on by default
+		var/sound_toggles
+		S["toggles_sound"] >> sound_toggles
+		sound_toggles |= (SOUND_FAX_MACHINE)
+		S["toggles_sound"] << sound_toggles
+
 	savefile_version = SAVEFILE_VERSION_MAX
 	return 1
 
@@ -91,7 +158,7 @@
 /proc/sanitize_keybindings(value)
 	var/list/base_bindings = sanitize_islist(value, list())
 	if(!length(base_bindings))
-		base_bindings = deepCopyList(GLOB.hotkey_keybinding_list_by_key)
+		base_bindings = deep_copy_list(GLOB.hotkey_keybinding_list_by_key)
 	for(var/key in base_bindings)
 		base_bindings[key] = base_bindings[key] & GLOB.keybindings_by_name
 		if(!length(base_bindings[key]))
@@ -125,6 +192,7 @@
 	S["toggles_langchat"] >> toggles_langchat
 	S["toggles_sound"] >> toggles_sound
 	S["toggle_prefs"] >> toggle_prefs
+	S["dual_wield_pref"] >> dual_wield_pref
 	S["toggles_flashing"] >> toggles_flashing
 	S["toggles_ert"] >> toggles_ert
 	S["toggles_admin"] >> toggles_admin
@@ -134,11 +202,14 @@
 	S["UI_style_alpha"] >> UI_style_alpha
 	S["item_animation_pref_level"] >> item_animation_pref_level
 	S["pain_overlay_pref_level"] >> pain_overlay_pref_level
+	S["flash_overlay_pref"] >> flash_overlay_pref
+	S["crit_overlay_pref"] >> crit_overlay_pref
 	S["stylesheet"] >> stylesheet
 	S["window_skin"] >> window_skin
 	S["fps"] >> fps
 	S["ghost_vision_pref"] >> ghost_vision_pref
 	S["ghost_orbit"] >> ghost_orbit
+	S["auto_observe"] >> auto_observe
 
 	S["human_name_ban"] >> human_name_ban
 
@@ -177,11 +248,6 @@
 	S["co_affiliation"] >> affiliation
 	S["yautja_status"] >> yautja_status
 	S["synth_status"] >> synth_status
-	S["key_bindings"] >> key_bindings
-	check_keybindings()
-
-	var/list/remembered_key_bindings
-	S["remembered_key_bindings"] >> remembered_key_bindings
 
 	S["lang_chat_disabled"] >> lang_chat_disabled
 	S["show_permission_errors"] >> show_permission_errors
@@ -195,6 +261,10 @@
 	S["autofit_viewport"] >> auto_fit_viewport
 	S["adaptive_zoom"] >> adaptive_zoom
 	S["tooltips"] >> tooltips
+	S["key_bindings"] >> key_bindings
+
+	var/list/remembered_key_bindings
+	S["remembered_key_bindings"] >> remembered_key_bindings
 
 	//Sanitize
 	ooccolor = sanitize_hexcolor(ooccolor, CONFIG_GET(string/ooc_color_default))
@@ -209,6 +279,7 @@
 	toggles_langchat = sanitize_integer(toggles_langchat, 0, SHORT_REAL_LIMIT, initial(toggles_langchat))
 	toggles_sound = sanitize_integer(toggles_sound, 0, SHORT_REAL_LIMIT, initial(toggles_sound))
 	toggle_prefs = sanitize_integer(toggle_prefs, 0, SHORT_REAL_LIMIT, initial(toggle_prefs))
+	dual_wield_pref = sanitize_integer(dual_wield_pref, 0, 2, initial(dual_wield_pref))
 	toggles_flashing= sanitize_integer(toggles_flashing, 0, SHORT_REAL_LIMIT, initial(toggles_flashing))
 	toggles_ert = sanitize_integer(toggles_ert, 0, SHORT_REAL_LIMIT, initial(toggles_ert))
 	toggles_admin = sanitize_integer(toggles_admin, 0, SHORT_REAL_LIMIT, initial(toggles_admin))
@@ -216,9 +287,12 @@
 	UI_style_alpha = sanitize_integer(UI_style_alpha, 0, 255, initial(UI_style_alpha))
 	item_animation_pref_level = sanitize_integer(item_animation_pref_level, SHOW_ITEM_ANIMATIONS_NONE, SHOW_ITEM_ANIMATIONS_ALL, SHOW_ITEM_ANIMATIONS_ALL)
 	pain_overlay_pref_level = sanitize_integer(pain_overlay_pref_level, PAIN_OVERLAY_BLURRY, PAIN_OVERLAY_LEGACY, PAIN_OVERLAY_BLURRY)
+	flash_overlay_pref = sanitize_integer(flash_overlay_pref, FLASH_OVERLAY_WHITE, FLASH_OVERLAY_DARK)
+	crit_overlay_pref = sanitize_integer(crit_overlay_pref, CRIT_OVERLAY_WHITE, CRIT_OVERLAY_DARK)
 	window_skin = sanitize_integer(window_skin, 0, SHORT_REAL_LIMIT, initial(window_skin))
 	ghost_vision_pref = sanitize_inlist(ghost_vision_pref, list(GHOST_VISION_LEVEL_NO_NVG, GHOST_VISION_LEVEL_MID_NVG, GHOST_VISION_LEVEL_FULL_NVG), GHOST_VISION_LEVEL_MID_NVG)
 	ghost_orbit = sanitize_inlist(ghost_orbit, GLOB.ghost_orbits, initial(ghost_orbit))
+	auto_observe = sanitize_integer(auto_observe, 0, 1, 1)
 	playtime_perks   = sanitize_integer(playtime_perks, 0, 1, 1)
 	xeno_vision_level_pref = sanitize_inlist(xeno_vision_level_pref, list(XENO_VISION_LEVEL_NO_NVG, XENO_VISION_LEVEL_MID_NVG, XENO_VISION_LEVEL_FULL_NVG), XENO_VISION_LEVEL_MID_NVG)
 	hear_vox = sanitize_integer(hear_vox, FALSE, TRUE, TRUE)
@@ -248,11 +322,11 @@
 	predator_h_style = sanitize_inlist(predator_h_style, GLOB.yautja_hair_styles_list, initial(predator_h_style))
 	predator_skin_color = sanitize_inlist(predator_skin_color, PRED_SKIN_COLOR, initial(predator_skin_color))
 	predator_flavor_text = predator_flavor_text ? sanitize_text(predator_flavor_text, initial(predator_flavor_text)) : initial(predator_flavor_text)
-	commander_status = sanitize_inlist(commander_status, whitelist_hierarchy, initial(commander_status))
-	commander_sidearm   = sanitize_inlist(commander_sidearm, list("Mateba","Colonel's Mateba","Golden Desert Eagle","Desert Eagle"), initial(commander_sidearm))
+	commander_status = sanitize_inlist(commander_status, GLOB.whitelist_hierarchy, initial(commander_status))
+	commander_sidearm   = sanitize_inlist(commander_sidearm, (CO_GUNS + COUNCIL_CO_GUNS), initial(commander_sidearm))
 	affiliation = sanitize_inlist(affiliation, FACTION_ALLEGIANCE_USCM_COMMANDER, initial(affiliation))
-	yautja_status = sanitize_inlist(yautja_status, whitelist_hierarchy + list("Elder"), initial(yautja_status))
-	synth_status = sanitize_inlist(synth_status, whitelist_hierarchy, initial(synth_status))
+	yautja_status = sanitize_inlist(yautja_status, GLOB.whitelist_hierarchy + list("Elder"), initial(yautja_status))
+	synth_status = sanitize_inlist(synth_status, GLOB.whitelist_hierarchy, initial(synth_status))
 	key_bindings = sanitize_keybindings(key_bindings)
 	remembered_key_bindings = sanitize_islist(remembered_key_bindings, null)
 	hotkeys = sanitize_integer(hotkeys, FALSE, TRUE, TRUE)
@@ -260,6 +334,9 @@
 	pref_special_job_options = sanitize_islist(pref_special_job_options, list())
 	pref_job_slots = sanitize_islist(pref_job_slots, list())
 	vars["fps"] = fps
+
+	check_keybindings()
+	S["key_bindings"] << key_bindings
 
 	if(remembered_key_bindings)
 		for(var/i in GLOB.keybindings_by_name)
@@ -306,6 +383,8 @@
 	S["tgui_say"] << tgui_say
 	S["item_animation_pref_level"] << item_animation_pref_level
 	S["pain_overlay_pref_level"] << pain_overlay_pref_level
+	S["flash_overlay_pref"] << flash_overlay_pref
+	S["crit_overlay_pref"] << crit_overlay_pref
 	S["stylesheet"] << stylesheet
 	S["be_special"] << be_special
 	S["default_slot"] << default_slot
@@ -315,6 +394,7 @@
 	S["toggles_langchat"] << toggles_langchat
 	S["toggles_sound"] << toggles_sound
 	S["toggle_prefs"] << toggle_prefs
+	S["dual_wield_pref"] << dual_wield_pref
 	S["toggles_flashing"] << toggles_flashing
 	S["toggles_ert"] << toggles_ert
 	S["toggles_admin"] << toggles_admin
@@ -322,6 +402,7 @@
 	S["fps"] << fps
 	S["ghost_vision_pref"] << ghost_vision_pref
 	S["ghost_orbit"] << ghost_orbit
+	S["auto_observe"] << auto_observe
 
 	S["human_name_ban"] << human_name_ban
 
@@ -400,7 +481,9 @@
 	S["gender"] >> gender
 	S["age"] >> age
 	S["ethnicity"] >> ethnicity
+	S["skin_color"] >> skin_color
 	S["body_type"] >> body_type
+	S["body_size"] >> body_size
 	S["language"] >> language
 	S["spawnpoint"] >> spawnpoint
 
@@ -463,6 +546,10 @@
 	S["uplinklocation"] >> uplinklocation
 	S["exploit_record"] >> exploit_record
 
+	var/tutorial_string = ""
+	S["completed_tutorials"] >> tutorial_string
+	tutorial_savestring_to_list(tutorial_string)
+
 	//Sanitize
 	metadata = sanitize_text(metadata, initial(metadata))
 	real_name = reject_bad_name(real_name)
@@ -475,8 +562,9 @@
 	be_random_body = sanitize_integer(be_random_body, 0, 1, initial(be_random_body))
 	gender = sanitize_gender(gender)
 	age = sanitize_integer(age, AGE_MIN, AGE_MAX, initial(age))
-	ethnicity = sanitize_ethnicity(ethnicity)
+	skin_color = sanitize_skin_color(skin_color)
 	body_type = sanitize_body_type(body_type)
+	body_size = sanitize_body_size(body_size)
 	r_hair = sanitize_integer(r_hair, 0, 255, initial(r_hair))
 	g_hair = sanitize_integer(g_hair, 0, 255, initial(g_hair))
 	b_hair = sanitize_integer(b_hair, 0, 255, initial(b_hair))
@@ -505,7 +593,7 @@
 	b_eyes = sanitize_integer(b_eyes, 0, 255, initial(b_eyes))
 	underwear = sanitize_inlist(underwear, gender == MALE ? GLOB.underwear_m : GLOB.underwear_f, initial(underwear))
 	undershirt = sanitize_inlist(undershirt, gender == MALE ? GLOB.undershirt_m : GLOB.undershirt_f, initial(undershirt))
-	backbag = sanitize_integer(backbag, 1, backbaglist.len, initial(backbag))
+	backbag = sanitize_integer(backbag, 1, length(GLOB.backbaglist), initial(backbag))
 	preferred_armor = sanitize_inlist(preferred_armor, GLOB.armor_style_list, "Random")
 	//b_type = sanitize_text(b_type, initial(b_type))
 
@@ -547,7 +635,9 @@
 	S["gender"] << gender
 	S["age"] << age
 	S["ethnicity"] << ethnicity
+	S["skin_color"] << skin_color
 	S["body_type"] << body_type
+	S["body_size"] << body_size
 	S["language"] << language
 	S["hair_red"] << r_hair
 	S["hair_green"] << g_hair
@@ -608,6 +698,8 @@
 	S["uplinklocation"] << uplinklocation
 	S["exploit_record"] << exploit_record
 
+	S["completed_tutorials"] << tutorial_list_to_savestring()
+
 	return 1
 
 /// checks through keybindings for outdated unbound keys and updates them
@@ -636,7 +728,7 @@
 					addedbind = TRUE
 		if(!addedbind)
 			notadded += kb
-	save_preferences()
+
 	if(length(notadded))
 		addtimer(CALLBACK(src, PROC_REF(announce_conflict), notadded), 5 SECONDS)
 

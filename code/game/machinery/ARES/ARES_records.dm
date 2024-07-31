@@ -45,7 +45,7 @@
 
 /datum/ares_record/flight/New(details, user)
 	time = worldtime2text()
-	src.title = "Flight Log"
+	title = "Flight Log"
 	src.details = details
 	src.user = user
 
@@ -57,6 +57,18 @@
 	src.title = title
 	src.details = details
 	src.user = user
+
+/datum/ares_record/tech
+	record_name = ARES_RECORD_TECH
+	/// If this tech unlock changed the tier.
+	var/is_tier = FALSE
+
+/datum/ares_record/tech/New(title, details, user, tier_tech)
+	time = worldtime2text()
+	src.title = title
+	src.details = details
+	src.user = user
+	is_tier = tier_tech
 
 /datum/ares_record/deletion
 	record_name = ARES_RECORD_DELETED
@@ -102,6 +114,7 @@
 	var/ref_holder = "\ref[src]"
 	var/pos = length(ref_holder)
 	var/new_id = "#[copytext("\ref[src]", pos - 4, pos)]"
+	new_id = uppertext(new_id)
 
 	ticket_time = worldtime2text()
 	ticket_submitter = user
@@ -115,17 +128,18 @@
 
 /datum/ares_ticket/access
 	ticket_type = ARES_RECORD_ACCESS
+	ticket_name = ARES_RECORD_ACCESS
 	var/user_id_num
 
-/datum/ares_ticket/access/New(user, name, details, priority, global_id_num)
+/datum/ares_ticket/access/New(user, details, priority, global_id_num)
 	var/ref_holder = "\ref[src]"
 	var/pos = length(ref_holder)
 	var/new_id = "#[copytext("\ref[src]", pos - 4, pos)]"
+	new_id = uppertext(new_id)
 
 	ticket_time = worldtime2text()
 	ticket_submitter = user
 	ticket_details = details
-	ticket_name = name
 	ticket_priority = priority
 	ticket_id = new_id
 	user_id_num = global_id_num

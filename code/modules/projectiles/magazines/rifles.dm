@@ -457,6 +457,14 @@
 	max_rounds = 4
 	gun_type = /obj/item/weapon/gun/boltaction/vulture
 	w_class = SIZE_MEDIUM // maybe small? This shit's >4 inches long mind you
+	ammo_band_icon = "+vulture_band"
+	ammo_band_icon_empty = "+vulture_band_e"
+
+/obj/item/ammo_magazine/rifle/boltaction/vulture/holo_target
+	name = "\improper M707 \"Vulture\" holo-target magazine (20x102mm)"
+	desc = "A magazine for the M707 \"Vulture\" anti-matieriel rifle. Contains up to 4 massively oversized <b>IFF-CAPABLE</b> holo-targeting rounds, which excel at marking heavy targets to be attacked by allied ground forces. The logistical requirements for such capabilities heavily hinder the performance and stopping power of this round."
+	default_ammo =  /datum/ammo/bullet/sniper/anti_materiel/vulture/holo_target
+	ammo_band_color = AMMO_BAND_COLOR_HOLOTARGETING
 
 //=ROYAL MARINES=\\
 
@@ -471,8 +479,8 @@
 	default_ammo = /datum/ammo/bullet/rifle
 	max_rounds = 30
 	gun_type = /obj/item/weapon/gun/rifle/rmc_f90
-	ammo_band_icon = "+m41a_band"
-	ammo_band_icon_empty = "+m41a_band_e"
+	ammo_band_icon = "+aug_band"
+	ammo_band_icon_empty = "+aug_band_e"
 
 /obj/item/ammo_magazine/rifle/rmc_f90/marksman
 	name = "\improper F903A1 Marksman magazine (10x24mm)"
@@ -483,3 +491,33 @@
 	gun_type = /obj/item/weapon/gun/rifle/rmc_f90/scope
 	max_rounds = 20
 	ammo_band_color = AMMO_BAND_COLOR_AP
+	ammo_band_icon = "+aug_dmr_band"
+	ammo_band_icon_empty = "+aug_dmr_band_e"
+
+/obj/item/ammo_magazine/rifle/rmc_f90/heap
+	name = "\improper F903 HEAP magazine (10x24mm)"
+	desc = "A 10mm armor piercing high explosive assault rifle magazine used by the royal marines."
+	default_ammo = /datum/ammo/bullet/rifle/heap
+	ammo_band_color = AMMO_BAND_COLOR_HEAP
+
+/obj/item/ammo_magazine/rifle/rmc_f90/marksman/heap
+	name = "\improper F903A1 Marksman magazine (10x24mm)"
+	desc = "A 10mm armor piercing high explosive assault rifle magazine used by the royal marines."
+	icon_state = "aug_dmr"
+	item_state = "aug_dmr"
+	default_ammo = /datum/ammo/bullet/rifle/heap
+	ammo_band_color = AMMO_BAND_COLOR_HEAP
+
+//--------------------------------------------------------
+//XM51 BREACHING SHOTGUN
+
+/obj/item/ammo_magazine/rifle/xm51
+	name = "\improper XM51 magazine (16g)"
+	desc = "A 16 gauge pump-action shotgun magazine."
+	icon_state = "xm51"
+	caliber = "16g"
+	w_class = SIZE_MEDIUM
+	default_ammo = /datum/ammo/bullet/shotgun/light/breaching
+	max_rounds = 12
+	gun_type = /obj/item/weapon/gun/rifle/xm51
+	transfer_handful_amount = 6

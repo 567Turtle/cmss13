@@ -17,7 +17,7 @@
 	screen.severity = severity
 	if (client && screen.should_show_to(src))
 		screen.update_for_view(client.view)
-		client.screen += screen
+		client.add_to_screen(screen)
 
 	return screen
 
@@ -33,12 +33,12 @@
 		addtimer(CALLBACK(src, PROC_REF(clear_fullscreen_after_animate), screen), animated, TIMER_CLIENT_TIME)
 	else
 		if(client)
-			client.screen -= screen
+			client.remove_from_screen(screen)
 		qdel(screen)
 
 /mob/proc/clear_fullscreen_after_animate(atom/movable/screen/fullscreen/screen)
 	if(client)
-		client.screen -= screen
+		client.remove_from_screen(screen)
 	qdel(screen)
 
 /mob/proc/clear_fullscreens()
@@ -48,7 +48,7 @@
 /mob/proc/hide_fullscreens()
 	if(client)
 		for(var/category in fullscreens)
-			client.screen -= fullscreens[category]
+			client.remove_from_screen(fullscreens[category])
 
 /mob/proc/reload_fullscreens()
 	if(client)
@@ -57,9 +57,9 @@
 			screen = fullscreens[category]
 			if(screen.should_show_to(src))
 				screen.update_for_view(client.view)
-				client.screen |= screen
+				client.add_to_screen(screen)
 			else
-				client.screen -= screen
+				client.remove_from_screen(screen)
 
 
 /atom/movable/screen/fullscreen
@@ -108,6 +108,9 @@
 	icon_state = "passage"
 	layer = FULLSCREEN_CRIT_LAYER
 
+/atom/movable/screen/fullscreen/crit/dark
+	color = COLOR_GRAY
+
 /atom/movable/screen/fullscreen/blind
 	icon_state = "blackimageoverlay"
 	layer = FULLSCREEN_BLIND_LAYER
@@ -126,6 +129,9 @@
 	icon = 'icons/mob/hud/screen1.dmi'
 	screen_loc = "WEST,SOUTH to EAST,NORTH"
 	icon_state = "noise"
+
+/atom/movable/screen/fullscreen/flash/dark
+	icon_state = "black"
 
 /atom/movable/screen/fullscreen/high
 	icon = 'icons/mob/hud/screen1.dmi'

@@ -1,4 +1,5 @@
 #define HYDRO_SPEED_MULTIPLIER 1
+#define HYDRO_WATER_CONSUMPTION_MULTIPLIER 1.5
 
 /obj/structure/machinery/portable_atmospherics/hydroponics
 	name = "hydroponics tray"
@@ -206,7 +207,7 @@
 	if(seed.nutrient_consumption > 0 && nutrilevel > 0 && prob(25))
 		nutrilevel -= max(0,seed.nutrient_consumption * HYDRO_SPEED_MULTIPLIER)
 	if(seed.water_consumption > 0 && waterlevel > 0  && prob(25))
-		waterlevel -= max(0,seed.water_consumption * HYDRO_SPEED_MULTIPLIER)
+		waterlevel -= floor(max(0,(seed.water_consumption * HYDRO_WATER_CONSUMPTION_MULTIPLIER) * HYDRO_SPEED_MULTIPLIER))
 
 	// Make sure the plant is not starving or thirsty. Adequate
 	// water and nutrients will cause a plant to become healthier.
@@ -219,21 +220,13 @@
 	if(nutrilevel < 1)
 		plant_health = 0
 
-	// Check that pressure, heat and light are all within bounds.
+	// Check that pressure, heat are all within bounds.
 	// First, handle an open system or an unconnected closed system.
-
-	var/turf/T = loc
-
-	// Handle light requirements.
-	if(T)
-		var/light_available = T.get_lumcount(0, 10)
-		if(abs(light_available - seed.ideal_light) > seed.light_tolerance)
-			plant_health -= healthmod
 
 	// Toxin levels beyond the plant's tolerance cause damage, but
 	// toxins are sucked up each tick and slowly reduce over time.
 	if(toxins > 0)
-		var/toxin_uptake = max(1,round(toxins/10))
+		var/toxin_uptake = max(1,floor(toxins/10))
 		if(toxins > seed.toxins_tolerance)
 			plant_health -= toxin_uptake
 		toxins -= toxin_uptake
@@ -269,7 +262,7 @@
 		pestlevel = 0
 
 	// If enough time (in cycles, not ticks) has passed since the plant was harvested, we're ready to harvest again.
-	else if(seed.products && seed.products.len && age > seed.production && (age - lastproduce) > seed.production && (!harvest && !dead))
+	else if(LAZYLEN(seed.products) && age > seed.production && (age - lastproduce) > seed.production && (!harvest && !dead))
 		harvest = 1
 		lastproduce = age
 
@@ -326,7 +319,7 @@
 
 		// Water dilutes toxin level.
 		if(water_added > 0)
-			toxins -= round(water_added/4)
+			toxins -= floor(water_added/4)
 
 	temp_chem_holder.reagents.clear_reagents()
 	check_level_sanity()
@@ -366,7 +359,7 @@
 	if(!user || !dead) return
 
 	if(closed_system)
-		to_chat(user, "You can't remove the dead plant while the lid is shut.")
+		to_chat(user, SPAN_WARNING("You can't remove the dead plant while the lid is shut."))
 		return
 
 	seed = null
@@ -376,10 +369,9 @@
 	yield_mod = 0
 	mutation_mod = 0
 
-	to_chat(user, "You remove the dead plant from the [src].")
+	to_chat(user, SPAN_NOTICE("You remove the dead plant from [src]."))
 	check_level_sanity()
 	update_icon()
-	return
 
 //Refreshes the icon and sets the luminosity
 /obj/structure/machinery/portable_atmospherics/hydroponics/update_icon()
@@ -398,7 +390,7 @@
 			overlays += "[seed.plant_icon]-harvest"
 		else if(age < seed.maturation)
 
-			var/t_growthstate = round(age/seed.maturation * seed.growth_stages)
+			var/t_growthstate = floor(age/seed.maturation * seed.growth_stages)
 			overlays += "[seed.plant_icon]-grow[t_growthstate]"
 			lastproduce = age
 		else
@@ -422,7 +414,7 @@
 	// Update bioluminescence.
 	if(seed)
 		if(seed.biolum)
-			set_light(round(seed.potency/10))
+			set_light(floor(seed.potency/10))
 			return
 
 	set_light(0)
@@ -433,7 +425,7 @@
 
 	//Remove the seed if something is already planted.
 	if(seed) seed = null
-	seed = seed_types[pick(list("mushrooms","plumphelmet","harebells","poppies","grass","weeds"))]
+	seed = GLOB.seed_types[pick(list("mushrooms","plumphelmet","harebells","poppies","grass","weeds"))]
 	if(!seed) return //Weed does not exist, someone fucked up.
 
 	dead = 0
@@ -456,14 +448,14 @@
 		return
 
 	// Check if we should even bother working on the current seed datum.
-	if(seed.mutants && seed.mutants.len && severity > 1)
+	if(LAZYLEN(seed.mutants) && severity > 1)
 		mutate_species()
 		return
 
 	// We need to make sure we're not modifying one of the global seed datums.
 	// If it's not in the global list, then no products of the line have been
 	// harvested yet and it's safe to assume it's restricted to this tray.
-	if(!isnull(seed_types[seed.name]))
+	if(!isnull(GLOB.seed_types[seed.name]))
 		seed = seed.diverge()
 	seed.mutate(severity,get_turf(src))
 
@@ -488,8 +480,8 @@
 
 	var/previous_plant = seed.display_name
 	var/newseed = seed.get_mutant_variant()
-	if(newseed in seed_types)
-		seed = seed_types[newseed]
+	if(newseed in GLOB.seed_types)
+		seed = GLOB.seed_types[newseed]
 	else
 		return
 
@@ -585,7 +577,7 @@
 				dead = 0
 				age = 1
 				//Snowflakey, maybe move this to the seed datum
-				plant_health = (istype(S, /obj/item/seeds/cutting) ? round(seed.endurance/rand(2,5)) : seed.endurance)
+				plant_health = (istype(S, /obj/item/seeds/cutting) ? floor(seed.endurance/rand(2,5)) : seed.endurance)
 
 				lastcycle = world.time
 
@@ -600,11 +592,30 @@
 	else if (istype(O, /obj/item/tool/minihoe))  // The minihoe
 
 		if(weedlevel > 0)
-			user.visible_message(SPAN_DANGER("[user] starts uprooting the weeds."), SPAN_DANGER("You remove the weeds from the [src]."))
+			user.visible_message(SPAN_DANGER("[user] starts uprooting the weeds."), SPAN_DANGER("You remove the weeds from [src]."))
 			weedlevel = 0
 			update_icon()
 		else
 			to_chat(user, SPAN_DANGER("This plot is completely devoid of weeds. It doesn't need uprooting."))
+
+	else if (istype(O, /obj/item/tool/shovel/spade))
+		if(isnull(seed))
+			return
+		user.visible_message(SPAN_DANGER("[user] starts to uproot the plant."), SPAN_DANGER("You begin removing plant from [src]..."))
+		if(!do_after(user, 1 SECONDS, INTERRUPT_NO_NEEDHAND|BEHAVIOR_IMMOBILE, BUSY_ICON_FRIENDLY, src, INTERRUPT_MOVED, BUSY_ICON_FRIENDLY))
+			return
+		to_chat(user, SPAN_NOTICE("You remove the plant from [src]."))
+		seed = null
+		dead = 0
+		sampled = 0
+		age = 0
+		harvest = 0
+		toxins = 0
+		yield_mod = 0
+		mutation_mod = 0
+
+		check_level_sanity()
+		update_icon()
 
 	else if (istype(O, /obj/item/storage/bag/plants))
 
@@ -612,7 +623,7 @@
 
 		var/obj/item/storage/bag/plants/S = O
 		for (var/obj/item/reagent_container/food/snacks/grown/G in locate(user.x,user.y,user.z))
-			if(!S.can_be_inserted(G))
+			if(!S.can_be_inserted(G, user))
 				return
 			S.handle_item_insertion(G, TRUE, user)
 
@@ -663,20 +674,9 @@
 
 	return info
 
-/obj/structure/machinery/portable_atmospherics/hydroponics/soil/show_hydro_info(mob/user as mob)
-	var/info = ..()
-	var/turf/T = loc
-	var/area/A = T.loc
-	var/light_available
-	if(A)
-		light_available = max(0,min(10,T.dynamic_lumcount)-5)
-
-	info += "The tray's sensor suite is reporting a light level of [light_available] lumens.\n"
-	return info
-
 /obj/structure/machinery/portable_atmospherics/hydroponics/attack_hand(mob/user as mob)
 
-	if(istype(usr,/mob/living/silicon))
+	if(istype(user, /mob/living/silicon))
 		return
 
 	if(harvest)
@@ -684,19 +684,7 @@
 	else if(dead)
 		remove_dead(user)
 	else
-		to_chat(usr, show_hydro_info(user))
-
-/obj/structure/machinery/portable_atmospherics/hydroponics/verb/close_lid()
-	set name = "Toggle Tray Lid"
-	set category = "Object"
-	set src in view(1)
-
-	if(!usr || usr.stat || usr.is_mob_restrained())
-		return
-
-	closed_system = !closed_system
-	to_chat(usr, "You [closed_system ? "close" : "open"] the tray's lid.")
-	update_icon()
+		to_chat(user, show_hydro_info(user))
 
 /obj/structure/machinery/portable_atmospherics/hydroponics/verb/flush() //used to reset the tray
 	set name = "Flush Tray"
@@ -716,7 +704,7 @@
 	toxins = 0
 	yield_mod = 0
 	mutation_mod = 0
-	waterlevel = 100
+	waterlevel = 0
 	nutrilevel = 0
 	pestlevel = 0
 	weedlevel = 0
@@ -743,8 +731,5 @@
 	else
 		..()
 
-/obj/structure/machinery/portable_atmospherics/hydroponics/soil/Initialize()
-	. = ..()
-	verbs -= /obj/structure/machinery/portable_atmospherics/hydroponics/verb/close_lid
-
 #undef HYDRO_SPEED_MULTIPLIER
+#undef HYDRO_WATER_CONSUMPTION_MULTIPLIER
