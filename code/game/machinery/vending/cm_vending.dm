@@ -73,12 +73,7 @@ IN_USE used for vending/denying
 	. = ..()
 	cm_build_inventory(get_listed_products(), 1, 3)
 
-/obj/structure/machinery/power_change(area/master_area = null)
-	..()
-	update_icon()
-
 /obj/structure/machinery/cm_vending/update_icon()
-
 	//restoring sprite to initial
 	overlays.Cut()
 	//icon_state = initial(icon_state) //shouldn't be needed but just in case
@@ -97,8 +92,9 @@ IN_USE used for vending/denying
 		apply_transform(A)
 
 /obj/structure/machinery/cm_vending/ex_act(severity)
-	if(indestructible)
+	if(explo_proof)
 		return
+
 	switch(severity)
 		if(0 to EXPLOSION_THRESHOLD_LOW)
 			if (prob(25))
@@ -153,7 +149,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 /obj/structure/machinery/cm_vending/get_examine_text(mob/living/carbon/human/user)
 	. = ..()
 
-	if(skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI) && hackable)
+	if(skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED) && hackable)
 		. += SPAN_NOTICE("You believe you can hack this one to remove the access requirements.")
 
 /obj/structure/machinery/cm_vending/proc/hack_access(mob/user)
@@ -378,7 +374,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 //------------INTERACTION PROCS---------------
 
 /obj/structure/machinery/cm_vending/attack_alien(mob/living/carbon/xenomorph/user)
-	if(stat & TIPPED_OVER || indestructible)
+	if(stat & TIPPED_OVER || unslashable)
 		to_chat(user, SPAN_WARNING("There's no reason to bother with that old piece of trash."))
 		return XENO_NO_DELAY_ACTION
 
@@ -386,12 +382,12 @@ GLOBAL_LIST_EMPTY(vending_products)
 		user.animation_attack_on(src)
 		if(prob(user.melee_damage_lower))
 			playsound(loc, 'sound/effects/metalhit.ogg', 25, 1)
-			user.visible_message(SPAN_DANGER("[user] smashes [src] beyond recognition!"), \
+			user.visible_message(SPAN_DANGER("[user] smashes [src] beyond recognition!"),
 			SPAN_DANGER("You enter a frenzy and smash [src] apart!"), null, 5, CHAT_TYPE_XENO_COMBAT)
 			malfunction()
 			tip_over()
 		else
-			user.visible_message(SPAN_DANGER("[user] slashes [src]!"), \
+			user.visible_message(SPAN_DANGER("[user] slashes [src]!"),
 			SPAN_DANGER("You slash [src]!"), null, 5, CHAT_TYPE_XENO_COMBAT)
 			playsound(loc, 'sound/effects/metalhit.ogg', 25, 1)
 		return XENO_ATTACK_ACTION
@@ -407,7 +403,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 			spark_system.set_up(5, 5, get_turf(src))
 			hacked = TRUE
 		return XENO_ATTACK_ACTION
-	user.visible_message(SPAN_WARNING("[user] begins to lean against [src]."), \
+	user.visible_message(SPAN_WARNING("[user] begins to lean against [src]."),
 	SPAN_WARNING("You begin to lean against [src]."), null, 5, CHAT_TYPE_XENO_COMBAT)
 	var/shove_time = 80
 	if(user.mob_size >= MOB_SIZE_BIG)
@@ -419,7 +415,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 
 	if(do_after(user, shove_time, INTERRUPT_ALL, BUSY_ICON_HOSTILE))
 		user.animation_attack_on(src)
-		user.visible_message(SPAN_DANGER("[user] knocks [src] down!"), \
+		user.visible_message(SPAN_DANGER("[user] knocks [src] down!"),
 		SPAN_DANGER("You knock [src] down!"), null, 5, CHAT_TYPE_XENO_COMBAT)
 		tip_over()
 	return XENO_NO_DELAY_ACTION
@@ -565,48 +561,28 @@ GLOBAL_LIST_EMPTY(vending_products)
 								to_chat(user, SPAN_WARNING("Only specialists can take specialist sets."))
 								vend_fail()
 								return FALSE
+
 							else if(!user.skills || user.skills.get_skill_level(SKILL_SPEC_WEAPONS) != SKILL_SPEC_TRAINED)
 								to_chat(user, SPAN_WARNING("You already have a specialization."))
 								vend_fail()
 								return FALSE
+
 							var/p_name = itemspec[1]
-							if(!GLOB.available_specialist_sets.Find(p_name))
+							if(!(p_name in GLOB.specialist_set_name_dict))
+								return
+
+							if(GLOB.specialist_set_name_dict[p_name].get_available_vendor_num() <= 0)
 								to_chat(user, SPAN_WARNING("That set is already taken."))
 								vend_fail()
 								return FALSE
+
 							var/obj/item/card/id/card = human_user.get_idcard()
-							if(!card?.check_biometrics(user))
+							if(!istype(card) || !card.check_biometrics(user))
 								to_chat(user, SPAN_WARNING("You must be wearing your [SPAN_INFO("dog tags")] to select a specialization!"))
 								return FALSE
-							var/specialist_assignment
-							switch(p_name)
-								if("Scout Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_SCOUT)
-									specialist_assignment = "Scout"
-								if("Sniper Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_SNIPER)
-									specialist_assignment = "Sniper"
-									GLOB.available_specialist_sets -= "Anti-materiel Sniper Set"
-								if("Anti-materiel Sniper Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_SNIPER)
-									specialist_assignment = "Heavy Sniper"
-									GLOB.available_specialist_sets -= "Sniper Set"
-								if("Demolitionist Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_ROCKET)
-									specialist_assignment = "Demo"
-								if("Heavy Grenadier Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_GRENADIER)
-									specialist_assignment = "Grenadier"
-								if("Pyro Set")
-									user.skills.set_skill(SKILL_SPEC_WEAPONS, SKILL_SPEC_PYRO)
-									specialist_assignment = "Pyro"
-								else
-									to_chat(user, SPAN_WARNING("<b>Something bad occurred with [src], tell a Dev.</b>"))
-									vend_fail()
-									return FALSE
-							card.set_assignment((human_user.assigned_squad ? (human_user.assigned_squad.name + " ") : "") + JOB_SQUAD_SPECIALIST + " ([specialist_assignment])")
-							GLOB.data_core.manifest_modify(user.real_name, WEAKREF(user), card.assignment)
-							GLOB.available_specialist_sets -= p_name
+
+							GLOB.specialist_set_name_dict[p_name].redeem_set(human_user)
+
 						else if(vendor_role.Find(JOB_SYNTH))
 							if(user.job != JOB_SYNTH)
 								to_chat(user, SPAN_WARNING("Only USCM Synthetics may vend experimental tool tokens."))
@@ -678,7 +654,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 		to_chat(user, SPAN_WARNING("You need to set [src] back upright first."))
 		return
 	if(HAS_TRAIT(W, TRAIT_TOOL_SCREWDRIVER))
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 			to_chat(user, SPAN_WARNING("You do not understand how to repair the broken [src]."))
 			return FALSE
 		else if(stat & MAINT)
@@ -705,7 +681,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 			to_chat(user, SPAN_WARNING("[msg]"))
 			return FALSE
 	else if(HAS_TRAIT(W, TRAIT_TOOL_WIRECUTTERS))
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 			to_chat(user, SPAN_WARNING("You do not understand how to repair the broken [src]."))
 			return FALSE
 		else if(stat & REPAIR_STEP_ONE)
@@ -722,7 +698,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 			to_chat(user, SPAN_WARNING("[msg]"))
 			return FALSE
 	else if(iswire(W))
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 			to_chat(user, SPAN_WARNING("You do not understand how to repair the broken [src]."))
 			return FALSE
 		var/obj/item/stack/cable_coil/CC = W
@@ -745,7 +721,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 			to_chat(user, SPAN_WARNING("[msg]"))
 			return
 	else if(istype(W, /obj/item/stack/sheet/metal))
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 			to_chat(user, SPAN_WARNING("You do not understand how to repair the broken [src]."))
 			return FALSE
 		var/obj/item/stack/sheet/metal/M = W
@@ -768,7 +744,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 	else if(HAS_TRAIT(W, TRAIT_TOOL_MULTITOOL))
 		var/obj/item/device/multitool/MT = W
 
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI) && !skillcheckexplicit(user, SKILL_ANTAG, SKILL_ANTAG_AGENT))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED) && !skillcheckexplicit(user, SKILL_ANTAG, SKILL_ANTAG_AGENT))
 			to_chat(user, SPAN_WARNING("You do not understand how tweak access requirements in [src]."))
 			return FALSE
 		if(stat != WORKING)
@@ -791,7 +767,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 		. = redeem_token(W, user)
 		return
 
-	..()
+	. = ..()
 
 /obj/structure/machinery/cm_vending/proc/get_listed_products(mob/user)
 	return listed_products
@@ -852,6 +828,8 @@ GLOBAL_LIST_EMPTY(vending_products)
 				.["theme"] = VENDOR_THEME_UPP
 			if(FACTION_CLF)
 				.["theme"] = VENDOR_THEME_CLF
+			if(FACTION_YAUTJA)
+				.["theme"] = VENDOR_THEME_YAUTJA
 	.["show_points"] = show_points | use_snowflake_points
 
 /obj/structure/machinery/cm_vending/ui_assets(mob/user)
@@ -1016,12 +994,19 @@ GLOBAL_LIST_EMPTY(vending_products)
 	.["displayed_categories"] = vendor_user_inventory_list(user, null, 4)
 
 /obj/structure/machinery/cm_vending/sorted/MouseDrop_T(atom/movable/A, mob/user)
+
 	if(inoperable())
 		return
+
+	if(!isturf(A.loc) && !ishuman(A.loc))
+		return
+
 	if(user.stat || user.is_mob_restrained())
 		return
+
 	if(get_dist(user, src) > 1 || get_dist(src, A) > 1)
 		return
+
 	if(!ishuman(user))
 		return
 
@@ -1034,25 +1019,25 @@ GLOBAL_LIST_EMPTY(vending_products)
 			to_chat(user, SPAN_WARNING("[src] is already being restocked, you will get in the way!"))
 			return
 
-		user.visible_message(SPAN_NOTICE("[user] starts stocking a bunch of supplies into [src]."), \
+		user.visible_message(SPAN_NOTICE("[user] starts stocking a bunch of supplies into [src]."),
 		SPAN_NOTICE("You start stocking a bunch of supplies into [src]."))
 		being_restocked = TRUE
 
 		for(var/obj/item/item in container.contents)
 			if(!do_after(user, 1 SECONDS, INTERRUPT_ALL, BUSY_ICON_GENERIC, src))
 				being_restocked = FALSE
-				user.visible_message(SPAN_NOTICE("[user] stopped stocking [src] with supplies."), \
+				user.visible_message(SPAN_NOTICE("[user] stopped stocking [src] with supplies."),
 				SPAN_NOTICE("You stop stocking [src] with supplies."))
 				return
 			if(QDELETED(item) || item.loc != container)
 				being_restocked = FALSE
-				user.visible_message(SPAN_NOTICE("[user] stopped stocking [src] with supplies."), \
+				user.visible_message(SPAN_NOTICE("[user] stopped stocking [src] with supplies."),
 				SPAN_NOTICE("You stop stocking [src] with supplies."))
 				return
 			stock(item, user)
 
 		being_restocked = FALSE
-		user.visible_message(SPAN_NOTICE("[user] finishes stocking [src] with supplies."), \
+		user.visible_message(SPAN_NOTICE("[user] finishes stocking [src] with supplies."),
 		SPAN_NOTICE("You finish stocking [src] with supplies."))
 		return
 
@@ -1101,7 +1086,7 @@ GLOBAL_LIST_EMPTY(vending_products)
 				container.remove_from_storage(item_to_stock, user.loc)
 
 			qdel(item_to_stock)
-			user.visible_message(SPAN_NOTICE("[user] stocks [src] with \a [vendspec[1]]."), \
+			user.visible_message(SPAN_NOTICE("[user] stocks [src] with \a [vendspec[1]]."),
 			SPAN_NOTICE("You stock [src] with \a [vendspec[1]]."))
 			if(partial_stacks)
 				var/obj/item/stack/item_stack = item_to_stock
@@ -1236,6 +1221,7 @@ GLOBAL_LIST_INIT(cm_vending_gear_corresponding_types_list, list(
 		/obj/item/ammo_box/magazine/lever_action/training/empty = /obj/item/ammo_box/magazine/lever_action/training,
 		/obj/item/ammo_box/magazine/lever_action/tracker/empty = /obj/item/ammo_box/magazine/lever_action/tracker,
 		/obj/item/ammo_box/magazine/lever_action/marksman/empty = /obj/item/ammo_box/magazine/lever_action/marksman,
+		/obj/item/ammo_box/magazine/lever_action/xm88/empty = /obj/item/ammo_box/magazine/lever_action/xm88,
 
 		/obj/item/ammo_box/rounds/smg/empty = /obj/item/ammo_box/rounds/smg,
 		/obj/item/ammo_box/rounds/smg/ap/empty = /obj/item/ammo_box/rounds/smg/ap,
@@ -1366,7 +1352,7 @@ GLOBAL_LIST_INIT(cm_vending_gear_corresponding_types_list, list(
 	if(LAZYLEN(itemspec)) //making sure it's not empty
 		if(vend_delay)
 			overlays.Cut()
-			icon_state = "[initial(icon_state)]_vend"
+			flick("[initial(icon_state)]_vend", src)
 			if(vend_sound)
 				playsound(loc, vend_sound, 25, 1, 2) //heard only near vendor
 			sleep(vend_delay)
@@ -1488,7 +1474,7 @@ GLOBAL_LIST_INIT(cm_vending_gear_corresponding_types_list, list(
 				spawned += new itemspec_item(loc)
 		if(throw_objects)
 			for(var/atom/movable/spawned_atom in spawned)
-				INVOKE_ASYNC(spawned_atom, TYPE_PROC_REF(/atom/movable, throw_atom), pick(orange(src, 4)), 4, SPEED_FAST)
+				INVOKE_ASYNC(spawned_atom, TYPE_PROC_REF(/atom/movable, throw_atom), pick(ORANGE_TURFS(4, src)), 4, SPEED_FAST)
 	stat &= ~IN_USE
 	if(destroy)
 		qdel(src)

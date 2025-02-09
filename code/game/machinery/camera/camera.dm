@@ -3,6 +3,7 @@
 	desc = "It's used to monitor rooms."
 	icon = 'icons/obj/structures/machinery/monitors.dmi'
 	icon_state = "autocam_editor"
+	needs_power = FALSE
 	use_power = USE_POWER_ACTIVE
 	idle_power_usage = 5
 	active_power_usage = 10
@@ -33,9 +34,6 @@
 	var/alarm_on = 0
 
 	var/colony_camera_mapload = TRUE
-
-	/// If this camera should have innate EMP-proofing
-	var/emp_proof = FALSE
 
 	///Autonaming
 	var/autoname = FALSE
@@ -200,7 +198,7 @@ GLOBAL_LIST_EMPTY_TYPED(all_cameras, /obj/structure/machinery/camera)
 					to_chat(O, "[U] holds \a [itemname] up to one of the cameras ...")
 					show_browser(O, info, itemname, itemname)
 	else
-		..()
+		. = ..()
 	return
 
 /obj/structure/machinery/camera/proc/toggle_cam_status(mob/user, silent)
@@ -263,9 +261,11 @@ GLOBAL_LIST_EMPTY_TYPED(all_cameras, /obj/structure/machinery/camera)
 //Return a working camera that can see a given mob
 //or null if none
 /proc/seen_by_camera(mob/M)
-	for(var/obj/structure/machinery/camera/C in oview(4, M))
+	FOR_DOVIEW(var/obj/structure/machinery/camera/C, 4, M, HIDE_INVISIBLE_OBSERVER)
 		if(C.can_use()) // check if camera disabled
+			FOR_DOVIEW_END
 			return C
+	FOR_DOVIEW_END
 	return null
 
 /proc/near_range_camera(mob/M)
@@ -306,9 +306,9 @@ GLOBAL_LIST_EMPTY_TYPED(all_cameras, /obj/structure/machinery/camera)
 	unslashable = TRUE
 	unacidable = TRUE
 	colony_camera_mapload = FALSE
-	var/obj/item/device/camera/broadcasting/linked_broadcasting
+	var/obj/item/device/broadcasting/linked_broadcasting
 
-/obj/structure/machinery/camera/correspondent/Initialize(mapload, obj/item/device/camera/broadcasting/camera_item)
+/obj/structure/machinery/camera/correspondent/Initialize(mapload, obj/item/device/broadcasting/camera_item)
 	. = ..()
 	if(!camera_item)
 		return INITIALIZE_HINT_QDEL
@@ -364,3 +364,7 @@ GLOBAL_LIST_EMPTY_TYPED(all_cameras, /obj/structure/machinery/camera)
 
 /obj/structure/machinery/camera/cas/isXRay()
 	return TRUE
+
+/obj/structure/machinery/camera/overwatch
+	name = "overwatch camera"
+	network = list(CAMERA_NET_OVERWATCH)

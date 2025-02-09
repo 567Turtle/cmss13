@@ -10,6 +10,9 @@
 	languages = list(LANGUAGE_ENGLISH, LANGUAGE_JAPANESE)
 	var/headset_type = /obj/item/device/radio/headset/distress/WY
 
+	minimap_icon = "cl"
+	minimap_background = "background_goon"
+
 /datum/equipment_preset/wy/New()
 	. = ..()
 	access += get_access(ACCESS_LIST_WY_BASE)
@@ -29,6 +32,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_TRAINEE
 	rank = JOB_TRAINEE
+	minimap_icon = "trainee"
 	paygrades = list(PAY_SHORT_WYC1 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/trainee/load_gear(mob/living/carbon/human/new_human)
@@ -40,6 +44,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_JUNIOR_EXECUTIVE
 	rank = JOB_JUNIOR_EXECUTIVE
+	minimap_icon = "junior_exec"
 	paygrades = list(PAY_SHORT_WYC2 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/exec
@@ -54,6 +59,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_SENIOR_EXECUTIVE
 	rank = JOB_SENIOR_EXECUTIVE
+	minimap_icon = "senior_exec"
 	paygrades = list(PAY_SHORT_WYC4 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/exec_spec
@@ -61,6 +67,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_EXECUTIVE_SPECIALIST
 	rank = JOB_EXECUTIVE_SPECIALIST
+	minimap_icon = "exec_spec"
 	paygrades = list(PAY_SHORT_WYC5 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/exec_spec/lawyer
@@ -69,6 +76,7 @@
 /datum/equipment_preset/wy/exec_spec/lawyer/load_gear(mob/living/carbon/human/new_human)
 	new_human.equip_to_slot_or_del(new /obj/item/device/radio/headset/distress/WY(new_human), WEAR_L_EAR)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/under/liaison_suit/blue(new_human), WEAR_BODY)
+	new_human.equip_to_slot_or_del(new /obj/item/clothing/accessory/blue(new_human), WEAR_ACCESSORY)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/suit/storage/jacket/marine/corporate/blue(new_human), WEAR_JACKET)
 	new_human.equip_to_slot_or_del(new /obj/item/tool/pen/clicky(new_human), WEAR_IN_BACK)
 	new_human.equip_to_slot_or_del(new /obj/item/clipboard(new_human), WEAR_IN_BACK)
@@ -82,6 +90,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_EXECUTIVE_SUPERVISOR
 	rank = JOB_EXECUTIVE_SUPERVISOR
+	minimap_icon = "exec_super"
 	paygrades = list(PAY_SHORT_WYC6 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/exec_supervisor/lawyer
@@ -91,6 +100,7 @@
 	new_human.equip_to_slot_or_del(new /obj/item/device/radio/headset/distress/WY(new_human), WEAR_L_EAR)
 	new_human.equip_to_slot_or_del(new /obj/item/storage/secure/briefcase(new_human), WEAR_R_HAND)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/under/liaison_suit/black(new_human), WEAR_BODY)
+	new_human.equip_to_slot_or_del(new /obj/item/clothing/accessory/black(new_human), WEAR_ACCESSORY)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/suit/storage/jacket/marine/corporate/black(new_human), WEAR_JACKET)
 	new_human.equip_to_slot_or_del(new /obj/item/tool/pen/clicky(new_human), WEAR_IN_BACK)
 	new_human.equip_to_slot_or_del(new /obj/item/clipboard(new_human), WEAR_IN_BACK)
@@ -103,6 +113,7 @@
 	skills = /datum/skills/civilian/manager
 	idtype = /obj/item/card/id/silver/clearance_badge/manager
 	headset_type = /obj/item/device/radio/headset/distress/pmc/command
+	minimap_background = "background_wy_management"
 
 /datum/equipment_preset/wy/manager/New()
 	. = ..()
@@ -120,6 +131,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_ASSISTANT_MANAGER
 	rank = JOB_ASSISTANT_MANAGER
+	minimap_icon = "ass_man"
 	paygrades = list(PAY_SHORT_WYC7 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/manager/division_manager
@@ -127,6 +139,7 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_DIVISION_MANAGER
 	rank = JOB_DIVISION_MANAGER
+	minimap_icon = "div_man"
 	paygrades = list(PAY_SHORT_WYC8 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/manager/chief_executive
@@ -134,20 +147,32 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_CHIEF_EXECUTIVE
 	rank = JOB_CHIEF_EXECUTIVE
+	minimap_icon = "chief_man"
 	paygrades = list(PAY_SHORT_WYC9 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/wy/manager/chief_executive/New()
 	. = ..()
 	access = get_access(ACCESS_LIST_WY_ALL)
 
+/datum/equipment_preset/wy/manager/director/deputy
+	name = "Corporate - J - Deputy Director"
+	flags = EQUIPMENT_PRESET_EXTRA
+	assignment = JOB_DEPUTY_DIRECTOR
+	rank = JOB_DEPUTY_DIRECTOR
+	minimap_icon = "dep_director"
+	paygrades = list(PAY_SHORT_WYC10 = JOB_PLAYTIME_TIER_0)
+	gun_type = /obj/item/storage/belt/gun/m4a3/heavy/co_golden
+
 /datum/equipment_preset/wy/manager/director
-	name = "Corporate - J - Director"
+	name = "Corporate - K - Director"
 	flags = EQUIPMENT_PRESET_EXTRA
 	assignment = JOB_DIRECTOR
 	rank = JOB_DIRECTOR
-	paygrades = list(PAY_SHORT_WYC10 = JOB_PLAYTIME_TIER_0)
+	minimap_icon = "director"
+	paygrades = list(PAY_SHORT_WYC11 = JOB_PLAYTIME_TIER_0)
 	skills = /datum/skills/civilian/manager/director
 	headset_type = /obj/item/device/radio/headset/distress/pmc/command/director
+	var/gun_type = /obj/item/storage/belt/gun/mateba/general
 
 /datum/equipment_preset/wy/manager/director/New()
 	. = ..()
@@ -157,5 +182,5 @@
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/under/suit_jacket/director(new_human), WEAR_BODY)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/suit/storage/director(new_human), WEAR_JACKET)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/head/director(new_human), WEAR_HEAD)
-	new_human.equip_to_slot_or_del(new /obj/item/storage/belt/gun/mateba/general(new_human), WEAR_WAIST)
+	new_human.equip_to_slot_or_del(new gun_type(new_human), WEAR_WAIST)
 	..()
